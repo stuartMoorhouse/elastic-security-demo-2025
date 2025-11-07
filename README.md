@@ -7,7 +7,7 @@ A comprehensive demonstration environment showcasing Elastic Security 9.2 capabi
 This project automates the deployment of a complete security demonstration environment featuring:
 
 - **Detection as Code (DaC) workflow** - Version-controlled detection rules with GitOps
-- **Red Team vs Blue Team simulation** - Live attack chain demonstration
+- **Purple Team Exercise** - Red team simulated attacks with blue team detection and response
 - **Elastic Security 9.2 features** - Case management with auto-extracted observables
 - **Full MITRE ATT&CK coverage** - Complete kill chain visibility
 
@@ -17,10 +17,10 @@ This project automates the deployment of a complete security demonstration envir
 +------------------------------------------------------------------+
 |                         AWS Environment                          |
 +---------------------------+--------------------------------------+
-|  Attacker VM (red-01)     |      Victim VM (blue-01)             |
+|  Red Team VM (red-01)     |      Blue Team VM (blue-01)          |
 |  - Ubuntu 22.04           |      - Ubuntu 22.04                  |
 |  - Metasploit             |      - Vulnerable Tomcat 9.0.30      |
-|  - detection-rules CLI    |      - Elastic Agent (dev)           |
+|  - Offensive tools        |      - Elastic Agent (dev)           |
 |  - 8GB RAM (t3.large)     |      - 8GB RAM (t3.large)            |
 +---------------------------+--------------------------------------+
                                     |
@@ -42,18 +42,30 @@ This project automates the deployment of a complete security demonstration envir
 |         - Version control                                        |
 |         - CI/CD (optional)                                       |
 +------------------------------------------------------------------+
+                                    ^
+                                    |
++------------------------------------------------------------------+
+|                      Local Machine (You)                         |
+|         - detection-rules CLI                                    |
+|         - Rule development and export                            |
+|         - Git client for version control                         |
++------------------------------------------------------------------+
 ```
 
-## Demo Workflow
+## Purple Team Exercise Workflow
 
-1. **Design** - Create custom detection rule in Kibana (ec-local)
-2. **Export** - Export rule to local detection-rules repository
-3. **Commit** - Push rule to GitHub fork
-4. **Deploy** - (Optional) CI/CD deploys to ec-dev
-5. **Attack** - Execute attack chain from red-01 against blue-01
-6. **Detect** - Rules trigger alerts in ec-dev
-7. **Investigate** - Create case with auto-extracted observables
-8. **Respond** - Document investigation and remediation
+### Setup Phase (Your Local Machine)
+1. **Setup** - Configure detection-rules CLI on your local machine (see `instructions/local-setup.md`)
+2. **Design** - Create custom detection rule in Kibana (ec-local)
+3. **Export** - Export rule using detection-rules CLI to local repository
+4. **Commit** - Push rule to GitHub fork
+5. **Deploy** - CI/CD automatically deploys to ec-dev
+
+### Exercise Phase (AWS VMs)
+6. **Red Team** - Execute simulated attack chain from red-01 → blue-01
+7. **Blue Team Detection** - Rules trigger alerts in ec-dev
+8. **Blue Team Investigation** - Create case with auto-extracted observables
+9. **Blue Team Response** - Document investigation and remediation
 
 ## Prerequisites
 
@@ -151,31 +163,46 @@ terraform output elastic_dev_password
 terraform output -json > ../deployment-info.json
 ```
 
-### 4. Set Up VMs
+### 4. Set Up Local Machine
+
+**First, configure your local machine for rule development:**
+
+```bash
+# Follow instructions/local-setup.md
+# This sets up:
+# - detection-rules CLI
+# - Python virtual environment
+# - Elastic Cloud connections
+# - Git workflow
+```
+
+This is **required** for rule development and export.
+
+### 5. Set Up VMs
 
 Follow the detailed setup guides in the `instructions/` directory:
 
-**Attacker VM (red-01):**
+**Red Team VM (red-01):**
 ```bash
-# SSH to attacker VM
+# SSH to red team VM
 ssh -i ~/.ssh/id_rsa ubuntu@<red-01-public-ip>
 
-# Follow instructions/attacker-vm.md
-# Installs: Metasploit, detection-rules, Python, nmap
+# Follow instructions/red-vm.md
+# Installs: Metasploit, offensive tools (15-20 min)
 ```
 
-**Victim VM (blue-01):**
+**Blue Team VM (blue-01):**
 ```bash
-# SSH to victim VM
+# SSH to blue team VM
 ssh -i ~/.ssh/id_rsa ubuntu@<blue-01-public-ip>
 
-# Follow instructions/victim-vm.md
+# Follow instructions/blue-vm.md
 # Installs: Vulnerable Tomcat 9.0.30, Elastic Agent
 ```
 
-### 5. Run Demo
+### 6. Run Purple Team Exercise
 
-Follow `instructions/demo-execution-script.md` for the complete demonstration workflow.
+Follow `instructions/demo-execution-script.md` for the complete purple team exercise workflow.
 
 ## Project Structure
 
@@ -196,9 +223,10 @@ security-demo-2025/
 ├── state/                       # Terraform state (gitignored)
 ├── instructions/                # Detailed setup guides
 │   ├── prompt.md               # Original requirements
-│   ├── attacker-vm.md          # Attacker VM setup
-│   ├── victim-vm.md            # Victim VM setup
-│   └── demo-execution-script.md # Demo workflow
+│   ├── local-setup.md          # Local machine detection-rules CLI setup
+│   ├── red-vm.md               # Red team VM setup (Metasploit)
+│   ├── blue-vm.md              # Blue team VM setup (Tomcat + Agent)
+│   └── demo-execution-script.md # Purple team exercise workflow
 └── example-terraform/           # Reference implementation
 ```
 
@@ -353,8 +381,8 @@ gh repo delete <your-username>/detection-rules --yes
 **Stop EC2 instances but keep Elastic:**
 ```bash
 # Stop instances
-aws ec2 stop-instances --instance-ids $(terraform output -json | jq -r '.attacker_vm.value.instance_id')
-aws ec2 stop-instances --instance-ids $(terraform output -json | jq -r '.victim_vm.value.instance_id')
+aws ec2 stop-instances --instance-ids $(terraform output -json | jq -r '.red_vm.value.instance_id')
+aws ec2 stop-instances --instance-ids $(terraform output -json | jq -r '.blue_vm.value.instance_id')
 
 # Start them later
 aws ec2 start-instances --instance-ids i-xxx i-yyy
@@ -370,9 +398,10 @@ terraform apply -target=ec_deployment.local -target=ec_deployment.dev -destroy
 
 ### Included Guides
 
-- `instructions/attacker-vm.md` - Complete attacker VM setup (30-45 min)
-- `instructions/victim-vm.md` - Vulnerable Tomcat installation script
-- `instructions/demo-execution-script.md` - Full demo workflow (30-35 min)
+- `instructions/local-setup.md` - Local machine detection-rules CLI setup (20-30 min)
+- `instructions/red-vm.md` - Red team VM setup with Metasploit (15-20 min)
+- `instructions/blue-vm.md` - Blue team VM with vulnerable Tomcat and Elastic Agent
+- `instructions/demo-execution-script.md` - Full purple team exercise workflow (30-35 min)
 
 ### External Resources
 
@@ -391,21 +420,23 @@ See `example-terraform/` directory for a more complex implementation with:
 
 ## Security Notes
 
-**This is a demonstration environment with intentional vulnerabilities:**
+**This is a purple team exercise environment with intentional vulnerabilities for educational purposes:**
 
-- Vulnerable Tomcat version (9.0.30)
-- Weak credentials (tomcat/tomcat)
-- Publicly accessible manager interface
-- No network segmentation
+- Vulnerable Tomcat version (9.0.30) - simulated vulnerable service
+- Weak credentials (tomcat/tomcat) - simulated misconfiguration
+- Publicly accessible manager interface - simulated exposed service
+- No network segmentation - simulated legacy environment
 
 **Do NOT:**
 - Use in production environments
-- Expose to the public internet beyond demo duration
+- Expose to the public internet beyond exercise duration
 - Use real credentials or data
 - Leave running unattended
+- Use techniques from this exercise for unauthorized access
 
 **Do:**
 - Restrict SSH access to your IP only
-- Destroy infrastructure after demo
+- Destroy infrastructure after exercise
 - Keep EC2 instances stopped when not in use
 - Monitor AWS and Elastic Cloud costs
+- Use only for authorized security training and demonstration

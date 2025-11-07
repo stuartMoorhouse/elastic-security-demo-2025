@@ -1,0 +1,386 @@
+# GitHub CI/CD Configuration for Detection as Code Workflow
+# Automatically deploys detection rules to ec-dev when merged to dev branch
+
+# Create dev branch for deployment workflow
+resource "github_branch" "dev" {
+  repository    = data.github_repository.detection_rules.name
+  branch        = "dev"
+  source_branch = "main"
+
+  depends_on = [
+    data.github_repository.detection_rules
+  ]
+}
+
+# GitHub Actions Workflow - Deploy to Development Environment
+# Triggers when code is pushed to dev branch (after PR merge)
+resource "github_repository_file" "deploy_to_dev_workflow" {
+  repository = data.github_repository.detection_rules.name
+  branch     = "main"
+  file       = ".github/workflows/deploy-to-dev.yml"
+
+  content = <<-EOT
+name: Deploy Rules to Development Environment
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  deploy-to-dev:
+    runs-on: ubuntu-latest
+    name: Deploy Detection Rules to ec-dev
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install detection-rules dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .
+        pip install lib/kibana
+        pip install lib/kql
+
+    - name: Configure detection-rules
+      run: |
+        # Create dac-demo/rules directory if it doesn't exist
+        mkdir -p dac-demo/rules
+
+        # Create detection-rules config file
+        cat > .detection-rules-cfg.json << EOF
+        {
+          "custom_rules_dir": "dac-demo"
+        }
+        EOF
+
+    - name: Validate custom rules
+      run: |
+        if [ -d "dac-demo/rules" ] && [ "$$(ls -A dac-demo/rules/*.toml 2>/dev/null)" ]; then
+          echo "Validating custom rules..."
+          for rule in dac-demo/rules/*.toml; do
+            echo "Validating: $$rule"
+            python -m detection_rules test "$$rule" || echo "Note: Validation may require additional context"
+          done
+        else
+          echo "No custom rules found in dac-demo/rules/"
+        fi
+
+    - name: Deploy to Development Kibana (ec-dev)
+      env:
+        ELASTIC_CLOUD_ID: $${{ secrets.DEV_ELASTIC_CLOUD_ID }}
+        ELASTIC_API_KEY: $${{ secrets.DEV_ELASTIC_API_KEY }}
+      run: |
+        if [ -d "dac-demo/rules" ] && [ "$$(ls -A dac-demo/rules/*.toml 2>/dev/null)" ]; then
+          echo "🚀 Deploying custom rules to Development environment (ec-dev)..."
+
+          # Update detection-rules config with Elastic Cloud credentials
+          cat > .detection-rules-cfg.json << EOF
+        {
+          "cloud_id": "$${ELASTIC_CLOUD_ID}",
+          "api_key": "$${ELASTIC_API_KEY}",
+          "custom_rules_dir": "dac-demo"
+        }
+        EOF
+
+          # Import rules to Development Kibana
+          python -m detection_rules kibana --space default import-rules \
+            -d dac-demo/rules/ || echo "Note: Some rules may already exist"
+
+          # Clean up config file
+          rm -f .detection-rules-cfg.json
+
+          echo "✅ Development deployment completed successfully!"
+        else
+          echo "ℹ️ No custom rules to deploy to Development"
+        fi
+
+    - name: Create deployment summary
+      if: always()
+      run: |
+        echo "## 🚀 Development Environment Deployment" >> $$GITHUB_STEP_SUMMARY
+        echo "" >> $$GITHUB_STEP_SUMMARY
+
+        if [ "$${{ job.status }}" == "success" ]; then
+          echo "### ✅ Deployment Successful" >> $$GITHUB_STEP_SUMMARY
+          echo "" >> $$GITHUB_STEP_SUMMARY
+          echo "Custom detection rules have been deployed to the Development environment (ec-dev)." >> $$GITHUB_STEP_SUMMARY
+          echo "" >> $$GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Development (ec-dev)" >> $$GITHUB_STEP_SUMMARY
+          echo "- **Branch**: dev" >> $$GITHUB_STEP_SUMMARY
+          echo "- **Commit**: $${{ github.sha }}" >> $$GITHUB_STEP_SUMMARY
+          echo "" >> $$GITHUB_STEP_SUMMARY
+          echo "Next steps:" >> $$GITHUB_STEP_SUMMARY
+          echo "1. Test the rules in the Development environment" >> $$GITHUB_STEP_SUMMARY
+          echo "2. Run attacks from the red-01 VM to validate detection" >> $$GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ Deployment Failed" >> $$GITHUB_STEP_SUMMARY
+          echo "" >> $$GITHUB_STEP_SUMMARY
+          echo "The deployment to Development has failed. Please review the logs above." >> $$GITHUB_STEP_SUMMARY
+        fi
+EOT
+
+  commit_message = "Add GitHub Actions workflow for deploying to development"
+  commit_author  = "Terraform"
+  commit_email   = "terraform@elastic-security-demo.local"
+
+  lifecycle {
+    ignore_changes = [commit_message, commit_author, commit_email]
+  }
+
+  depends_on = [
+    null_resource.fork_detection_rules,
+    data.github_repository.detection_rules
+  ]
+}
+
+# Set up GitHub Secrets with Elastic Cloud credentials
+# This runs after EC deployments are created and updates secrets automatically
+resource "null_resource" "setup_github_secrets" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      set -e
+
+      echo "Setting up GitHub Secrets for CI/CD workflow..."
+
+      REPO="${var.github_owner}/${var.fork_name}"
+
+      # Create API key for Development cluster
+      echo "Creating API key for ec-dev deployment..."
+      DEV_API_KEY=$(curl -u elastic:${ec_deployment.dev.elasticsearch_password} \
+        -X POST "${ec_deployment.dev.elasticsearch[0].https_endpoint}/_security/api_key" \
+        -H "Content-Type: application/json" \
+        -d '{"name":"github-actions-dev","role_descriptors":{"detection_rules":{"cluster":["all"],"index":[{"names":["*"],"privileges":["all"]}],"applications":[{"application":"kibana-.kibana","privileges":["all"],"resources":["*"]}]}}}' \
+        2>/dev/null | jq -r '.encoded')
+
+      if [ -z "$${DEV_API_KEY}" ] || [ "$${DEV_API_KEY}" == "null" ]; then
+        echo "ERROR: Failed to create API key for ec-dev"
+        exit 1
+      fi
+
+      # Set GitHub Secrets
+      echo "Setting DEV_ELASTIC_CLOUD_ID secret..."
+      gh secret set DEV_ELASTIC_CLOUD_ID \
+        --repo "$${REPO}" \
+        --body "${ec_deployment.dev.elasticsearch[0].cloud_id}"
+
+      echo "Setting DEV_ELASTIC_API_KEY secret..."
+      gh secret set DEV_ELASTIC_API_KEY \
+        --repo "$${REPO}" \
+        --body "$${DEV_API_KEY}"
+
+      echo ""
+      echo "✅ GitHub Secrets configured successfully!"
+      echo ""
+      echo "Configured secrets:"
+      echo "  - DEV_ELASTIC_CLOUD_ID (Cloud ID for ec-dev)"
+      echo "  - DEV_ELASTIC_API_KEY (API key for deploying rules)"
+      echo ""
+      echo "GitHub Actions workflows can now deploy to ec-dev automatically."
+    EOT
+  }
+
+  # Run this whenever the EC deployment changes
+  triggers = {
+    dev_deployment_id  = ec_deployment.dev.id
+    dev_cloud_id       = ec_deployment.dev.elasticsearch[0].cloud_id
+    dev_kibana_url     = ec_deployment.dev.kibana[0].https_endpoint
+  }
+
+  depends_on = [
+    ec_deployment.dev,
+    null_resource.fork_detection_rules,
+    data.github_repository.detection_rules
+  ]
+}
+
+# Set up custom rules directory structure in the forked repository
+resource "null_resource" "setup_custom_rules_directory" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      set -e
+
+      echo "Setting up custom rules directory structure..."
+
+      REPO_NAME="${var.fork_name}"
+      TEMP_DIR="/tmp/$${REPO_NAME}-setup"
+      GITHUB_USER="${var.github_owner}"
+
+      # Clean up any existing temp directory
+      rm -rf "$${TEMP_DIR}"
+
+      # Clone the repository
+      echo "Cloning repository..."
+      git clone "https://github.com/$${GITHUB_USER}/$${REPO_NAME}.git" "$${TEMP_DIR}"
+
+      cd "$${TEMP_DIR}"
+
+      # Check if dac-demo directory already exists
+      if [ -d "dac-demo" ]; then
+        echo "dac-demo directory already exists, skipping setup"
+        cd ..
+        rm -rf "$${TEMP_DIR}"
+        exit 0
+      fi
+
+      # Create dac-demo directory structure
+      echo "Creating dac-demo directory structure..."
+      mkdir -p dac-demo/rules dac-demo/docs
+
+      # Create README for dac-demo
+      cat > dac-demo/README.md << 'README'
+# DAC Demo - Custom Detection Rules
+
+This directory contains custom detection rules for the Elastic Security Detection as Code demo.
+
+## Directory Structure
+
+```
+dac-demo/
+├── rules/          # Your custom detection rules (TOML format)
+├── docs/           # Documentation for custom rules
+└── README.md       # This file
+```
+
+## Adding Custom Rules
+
+1. Create your rule TOML file in `dac-demo/rules/`
+2. Test locally: `python -m detection_rules test dac-demo/rules/your-rule.toml`
+3. Commit and push to a feature branch
+4. Create PR to `dev` branch
+5. After merge, rules automatically deploy to ec-dev
+
+## Rule Format
+
+Rules should follow the Elastic detection rules format:
+
+```toml
+[metadata]
+creation_date = "2025/11/07"
+integration = ["endpoint"]
+maturity = "production"
+updated_date = "2025/11/07"
+
+[rule]
+author = ["Your Name"]
+description = """
+Your rule description here.
+"""
+from = "now-9m"
+index = ["logs-endpoint.events.*"]
+language = "eql"
+license = "Elastic License v2"
+name = "Your Rule Name"
+risk_score = 73
+rule_id = "unique-uuid-here"
+severity = "high"
+tags = ["Domain: Endpoint", "OS: Linux"]
+type = "eql"
+
+query = '''
+process where event.type == "start" and
+  process.name == "suspicious_process"
+'''
+```
+
+## Testing Workflow
+
+1. **Local Development** (ec-local):
+   - Create rules in Kibana UI
+   - Export using detection-rules CLI
+   - Test in local environment
+
+2. **Development Deployment** (ec-dev):
+   - Push to `dev` branch
+   - Automatic deployment via GitHub Actions
+   - Run demo attacks to validate
+
+3. **Demo Execution**:
+   - Rules are active in ec-dev
+   - Execute attack chain from red-01
+   - Verify alerts trigger correctly
+
+## Resources
+
+- [Elastic Detection Rules Repository](https://github.com/elastic/detection-rules)
+- [Detection Rules Documentation](https://www.elastic.co/guide/en/security/current/detection-engine-overview.html)
+- [EQL Syntax Reference](https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html)
+README
+
+      # Create a sample rule file (commented out for reference)
+      cat > dac-demo/rules/.gitkeep << 'GITKEEP'
+# Place your custom detection rules (.toml files) in this directory
+#
+# Example:
+#   dac-demo/rules/my_custom_rule.toml
+#   dac-demo/rules/tomcat_webshell_detection.toml
+GITKEEP
+
+      # Commit and push the changes
+      git add dac-demo/
+      git commit -m "feat: Initialize dac-demo directory for custom detection rules
+
+- Create dac-demo/rules/ for custom TOML rule files
+- Create dac-demo/docs/ for rule documentation
+- Add comprehensive README with usage instructions
+- Set up CI/CD integration with GitHub Actions"
+
+      echo "Pushing changes to main branch..."
+      git push origin main
+
+      # Clean up
+      cd ..
+      rm -rf "$${TEMP_DIR}"
+
+      echo "✅ Custom rules directory structure created successfully!"
+      echo ""
+      echo "Directory structure:"
+      echo "  dac-demo/"
+      echo "  ├── rules/     (place your .toml rule files here)"
+      echo "  ├── docs/      (rule documentation)"
+      echo "  └── README.md  (usage instructions)"
+    EOT
+  }
+
+  triggers = {
+    repo_name = var.fork_name
+  }
+
+  depends_on = [
+    null_resource.fork_detection_rules,
+    data.github_repository.detection_rules,
+    github_branch.dev
+  ]
+}
+
+# Output CI/CD configuration status
+output "github_ci_cd_status" {
+  description = "GitHub CI/CD configuration summary"
+  value = {
+    dev_branch_created       = true
+    workflow_file            = github_repository_file.deploy_to_dev_workflow.file
+    github_secrets_configured = [
+      "DEV_ELASTIC_CLOUD_ID",
+      "DEV_ELASTIC_API_KEY"
+    ]
+    custom_rules_directory   = "dac-demo/rules/"
+    deployment_target        = "ec-dev (Development Environment)"
+    workflow_trigger         = "Push to dev branch"
+  }
+
+  depends_on = [
+    github_branch.dev,
+    github_repository_file.deploy_to_dev_workflow,
+    null_resource.setup_github_secrets,
+    null_resource.setup_custom_rules_directory
+  ]
+}

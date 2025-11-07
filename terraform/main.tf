@@ -75,10 +75,10 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# Security Group for Attacker VM (red-01)
-resource "aws_security_group" "attacker" {
-  name        = "${var.project_name}-attacker-sg"
-  description = "Security group for attacker VM (red-01)"
+# Security Group for Red Team VM (red-01)
+resource "aws_security_group" "red" {
+  name        = "${var.project_name}-red-sg"
+  description = "Security group for red team VM (red-01)"
   vpc_id      = aws_vpc.main.id
 
   # SSH access from allowed CIDR
@@ -90,22 +90,22 @@ resource "aws_security_group" "attacker" {
     cidr_blocks = [var.allowed_ssh_cidr]
   }
 
-  # Metasploit listener port (from victim VM)
+  # Metasploit listener port (from blue team VM)
   ingress {
     description     = "Metasploit listener"
     from_port       = 4444
     to_port         = 4444
     protocol        = "tcp"
-    security_groups = [aws_security_group.victim.id]
+    security_groups = [aws_security_group.blue.id]
   }
 
-  # Persistence callback port (from victim VM)
+  # Persistence callback port (from blue team VM)
   ingress {
     description     = "Persistence callback"
     from_port       = 4445
     to_port         = 4445
     protocol        = "tcp"
-    security_groups = [aws_security_group.victim.id]
+    security_groups = [aws_security_group.blue.id]
   }
 
   # All outbound traffic
@@ -118,16 +118,16 @@ resource "aws_security_group" "attacker" {
   }
 
   tags = {
-    Name    = "${var.project_name}-attacker-sg"
+    Name    = "${var.project_name}-red-sg"
     Project = var.project_name
-    Role    = "attacker"
+    Role    = "red-team"
   }
 }
 
-# Security Group for Victim VM (blue-01)
-resource "aws_security_group" "victim" {
-  name        = "${var.project_name}-victim-sg"
-  description = "Security group for victim VM (blue-01)"
+# Security Group for Blue Team VM (blue-01)
+resource "aws_security_group" "blue" {
+  name        = "${var.project_name}-blue-sg"
+  description = "Security group for blue team VM (blue-01)"
   vpc_id      = aws_vpc.main.id
 
   # SSH access from allowed CIDR
@@ -139,22 +139,22 @@ resource "aws_security_group" "victim" {
     cidr_blocks = [var.allowed_ssh_cidr]
   }
 
-  # Tomcat port (from attacker VM)
+  # Tomcat port (from red team VM)
   ingress {
     description     = "Tomcat HTTP"
     from_port       = 8080
     to_port         = 8080
     protocol        = "tcp"
-    security_groups = [aws_security_group.attacker.id]
+    security_groups = [aws_security_group.red.id]
   }
 
-  # ICMP for ping tests (from attacker VM)
+  # ICMP for ping tests (from red team VM)
   ingress {
-    description     = "ICMP from attacker"
+    description     = "ICMP from red team"
     from_port       = -1
     to_port         = -1
     protocol        = "icmp"
-    security_groups = [aws_security_group.attacker.id]
+    security_groups = [aws_security_group.red.id]
   }
 
   # All outbound traffic
@@ -167,9 +167,9 @@ resource "aws_security_group" "victim" {
   }
 
   tags = {
-    Name    = "${var.project_name}-victim-sg"
+    Name    = "${var.project_name}-blue-sg"
     Project = var.project_name
-    Role    = "victim"
+    Role    = "blue-team"
   }
 }
 
@@ -184,13 +184,13 @@ resource "aws_key_pair" "demo" {
   }
 }
 
-# Attacker VM (red-01)
-resource "aws_instance" "attacker" {
+# Red Team VM (red-01)
+resource "aws_instance" "red" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.aws_instance_type
   key_name               = aws_key_pair.demo.key_name
   subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.attacker.id]
+  vpc_security_group_ids = [aws_security_group.red.id]
 
   root_block_device {
     volume_size = 20
@@ -206,17 +206,17 @@ resource "aws_instance" "attacker" {
   tags = {
     Name    = "red-01"
     Project = var.project_name
-    Role    = "attacker"
+    Role    = "red-team"
   }
 }
 
-# Victim VM (blue-01)
-resource "aws_instance" "victim" {
+# Blue Team VM (blue-01)
+resource "aws_instance" "blue" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.aws_instance_type
   key_name               = aws_key_pair.demo.key_name
   subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.victim.id]
+  vpc_security_group_ids = [aws_security_group.blue.id]
 
   root_block_device {
     volume_size = 20
@@ -232,6 +232,6 @@ resource "aws_instance" "victim" {
   tags = {
     Name    = "blue-01"
     Project = var.project_name
-    Role    = "victim"
+    Role    = "blue-team"
   }
 }
