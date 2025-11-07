@@ -1,0 +1,25 @@
+# Project Configuration
+project_name = "elastic-security-demo"
+
+# AWS Configuration
+aws_region        = "us-east-1"
+aws_instance_type = "t3.large" # 8GB RAM for VMs (2 vCPU, 8GB RAM)
+
+# Elastic Cloud Configuration
+ec_region                = "us-east-1"
+elastic_version          = "9.2.0"
+deployment_template_id   = "aws-io-optimized-v2"
+elasticsearch_size       = "8g" # 8GB RAM as per requirements
+elasticsearch_zone_count = 1
+kibana_size              = "1g"
+kibana_zone_count        = 1
+integrations_server_size = "1g"
+integrations_server_zone_count = 1
+
+# Networking
+allowed_ssh_cidr = "YOUR_IP/32" # CHANGE_ME: Restrict to your IP (e.g., "203.0.113.0/32")
+vpc_cidr         = "10.0.0.0/16"
+
+# GitHub Configuration
+github_owner = "YOUR_GITHUB_USERNAME" # CHANGE_ME: Your GitHub username (e.g., "octocat")
+fork_name    = "detection-rules"      # Name of the forked repository

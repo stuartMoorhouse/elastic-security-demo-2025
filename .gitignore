@@ -1,0 +1,51 @@
+.gitignore
+
+# Claude Code specific
+.claude/
+CLAUDE.md
+about-this-template.md
+product-requirement-prompts.md
+
+# IDE
+elastic-security-demo.code-workspace
+.vscode/
+.idea/
+
+# Terraform
+state/
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform.tfstate.backup
+**/terraform.tfvars
+**/.terraformrc
+**/terraform.rc
+**/tfplan
+**/tfplan.*
+**/.terraform.tfstate.lock.info
+
+# Example terraform (contains secrets/credentials)
+example-terraform/
+
+# Credentials and secrets
+**/credentials/
+**/*credentials*.json
+**/*cluster*.json
+
+# SSH Keys
+*.pem
+*.key
+id_rsa*
+
+# Environment files
+.env
+.env.local
+*.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
