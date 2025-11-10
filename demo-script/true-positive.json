@@ -1,82 +1,102 @@
 {
   "@timestamp": "2025-11-10T15:34:22.847Z",
-  "agent.id": "b1c2d3e4-f5a6-7890-bcde-f12345678901",
-  "agent.type": "endpoint",
-  "agent.version": "9.0.5",
-  "data_stream.dataset": "endpoint.events.process",
-  "data_stream.namespace": "default",
-  "data_stream.type": "logs",
-  "ecs.version": "8.10.0",
-  "event.action": "exec",
-  "event.agent_id_status": "verified",
-  "event.category": "process",
-  "event.created": "2025-11-10T15:34:22.850Z",
-  "event.dataset": "endpoint.events.process",
-  "event.id": "MTIzNDU2Nzg5MGFiY2RlZi0xMjM0NTY3ODkw",
-  "event.ingested": "2025-11-10T15:34:25.000Z",
-  "event.kind": "event",
-  "event.module": "endpoint",
-  "event.outcome": "success",
-  "event.sequence": 8742001,
-  "event.type": "start",
-  "group.Ext.real.id": "1001",
-  "group.Ext.real.name": "tomcat",
-  "group.id": "1001",
-  "group.name": "tomcat",
-  "host.id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "host.name": "blue-01",
-  "host.os.type": "linux",
+  "agent": {
+    "id": "b1c2d3e4-f5a6-7890-bcde-f12345678901",
+    "type": "endpoint",
+    "version": "9.0.5"
+  },
+  "data_stream": {
+    "dataset": "endpoint.events.process",
+    "namespace": "default",
+    "type": "logs"
+  },
+  "ecs": {
+    "version": "8.10.0"
+  },
+  "event": {
+    "action": "exec",
+    "agent_id_status": "verified",
+    "category": "process",
+    "created": "2025-11-10T15:34:22.850Z",
+    "dataset": "endpoint.events.process",
+    "id": "MTIzNDU2Nzg5MGFiY2RlZi0xMjM0NTY3ODkw",
+    "ingested": "2025-11-10T15:34:25.000Z",
+    "kind": "event",
+    "module": "endpoint",
+    "outcome": "success",
+    "sequence": 8742001,
+    "type": "start"
+  },
+  "group": {
+    "Ext": {
+      "real": {
+        "id": "1001",
+        "name": "tomcat"
+      }
+    },
+    "id": "1001",
+    "name": "tomcat"
+  },
+  "host": {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "blue-01",
+    "os": {
+      "type": "linux"
+    }
+  },
   "message": "Endpoint process event",
-  "process.args": ["bash", "-c", "id"],
-  "process.args_count": 3,
-  "process.command_line": "bash -c id",
-  "process.command_line.caseless": "bash -c id",
-  "process.command_line.text": "bash -c id",
-  "process.entity_id": "YmFzaC1wcm9jZXNzLWVudGl0eS1pZA==",
-  "process.executable": "/usr/bin/bash",
-  "process.executable.caseless": "/usr/bin/bash",
-  "process.executable.text": "/usr/bin/bash",
-  "process.hash.sha256": "7d7e0b6c3c7c7c0f7e5c5e3c0b5c7c0e3e3c0e5c7c0e3e3c0e5c7c0e3e3c0e5c",
-  "process.name": "bash",
-  "process.name.caseless": "bash",
-  "process.name.text": "bash",
-  "process.parent.args": [
-    "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-    "-Djava.util.logging.config.file=/opt/tomcat/conf/logging.properties",
-    "-Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager",
-    "-Djdk.tls.ephemeralDHKeySize=2048",
-    "-Djava.protocol.handler.pkgs=org.apache.catalina.webresources",
-    "-Dorg.apache.catalina.security.SecurityListener.UMASK=0027",
-    "-Dignore.endorsed.dirs=",
-    "-classpath",
-    "/opt/tomcat/bin/bootstrap.jar:/opt/tomcat/bin/tomcat-juli.jar",
-    "-Dcatalina.base=/opt/tomcat",
-    "-Dcatalina.home=/opt/tomcat",
-    "-Djava.io.tmpdir=/opt/tomcat/temp",
-    "org.apache.catalina.startup.Bootstrap",
-    "start"
-  ],
-  "process.parent.args_count": 14,
-  "process.parent.command_line": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java -Djava.util.logging.config.file=/opt/tomcat/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Djdk.tls.ephemeralDHKeySize=2048 -Djava.protocol.handler.pkgs=org.apache.catalina.webresources -Dorg.apache.catalina.security.SecurityListener.UMASK=0027 -Dignore.endorsed.dirs= -classpath /opt/tomcat/bin/bootstrap.jar:/opt/tomcat/bin/tomcat-juli.jar -Dcatalina.base=/opt/tomcat -Dcatalina.home=/opt/tomcat -Djava.io.tmpdir=/opt/tomcat/temp org.apache.catalina.startup.Bootstrap start",
-  "process.parent.command_line.caseless": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java -djava.util.logging.config.file=/opt/tomcat/conf/logging.properties -djava.util.logging.manager=org.apache.juli.classloaderlogmanager -djdk.tls.ephemeraldhkeysize=2048 -djava.protocol.handler.pkgs=org.apache.catalina.webresources -dorg.apache.catalina.security.securitylistener.umask=0027 -dignore.endorsed.dirs= -classpath /opt/tomcat/bin/bootstrap.jar:/opt/tomcat/bin/tomcat-juli.jar -dcatalina.base=/opt/tomcat -dcatalina.home=/opt/tomcat -djava.io.tmpdir=/opt/tomcat/temp org.apache.catalina.startup.bootstrap start",
-  "process.parent.command_line.text": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java -Djava.util.logging.config.file=/opt/tomcat/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Djdk.tls.ephemeralDHKeySize=2048 -Djava.protocol.handler.pkgs=org.apache.catalina.webresources -Dorg.apache.catalina.security.SecurityListener.UMASK=0027 -Dignore.endorsed.dirs= -classpath /opt/tomcat/bin/bootstrap.jar:/opt/tomcat/bin/tomcat-juli.jar -Dcatalina.base=/opt/tomcat -Dcatalina.home=/opt/tomcat -Djava.io.tmpdir=/opt/tomcat/temp org.apache.catalina.startup.Bootstrap start",
-  "process.parent.entity_id": "dG9tY2F0LWphdmEtcGFyZW50LWVudGl0eQ==",
-  "process.parent.executable": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-  "process.parent.executable.caseless": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-  "process.parent.executable.text": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
-  "process.parent.name": "java",
-  "process.parent.name.caseless": "java",
-  "process.parent.name.text": "java",
-  "process.parent.pid": 2341,
-  "process.parent.start": "2025-11-10T12:15:30.123Z",
-  "process.parent.user.id": "1001",
-  "process.parent.user.name": "tomcat",
-  "process.parent.working_directory": "/opt/tomcat",
-  "process.pid": 8742,
-  "process.start": "2025-11-10T15:34:22.847Z",
-  "process.working_directory": "/opt/tomcat",
-  "user.Ext.real.id": "1001",
-  "user.Ext.real.name": "tomcat",
-  "user.id": "1001",
-  "user.name": "tomcat"
+  "process": {
+    "args": ["bash", "-c", "id"],
+    "args_count": 3,
+    "command_line": "bash -c id",
+    "entity_id": "YmFzaC1wcm9jZXNzLWVudGl0eS1pZA==",
+    "executable": "/usr/bin/bash",
+    "hash": {
+      "sha256": "7d7e0b6c3c7c7c0f7e5c5e3c0b5c7c0e3e3c0e5c7c0e3e3c0e5c7c0e3e3c0e5c"
+    },
+    "name": "bash",
+    "parent": {
+      "args": [
+        "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
+        "-Djava.util.logging.config.file=/opt/tomcat/conf/logging.properties",
+        "-Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager",
+        "-Djdk.tls.ephemeralDHKeySize=2048",
+        "-Djava.protocol.handler.pkgs=org.apache.catalina.webresources",
+        "-Dorg.apache.catalina.security.SecurityListener.UMASK=0027",
+        "-Dignore.endorsed.dirs=",
+        "-classpath",
+        "/opt/tomcat/bin/bootstrap.jar:/opt/tomcat/bin/tomcat-juli.jar",
+        "-Dcatalina.base=/opt/tomcat",
+        "-Dcatalina.home=/opt/tomcat",
+        "-Djava.io.tmpdir=/opt/tomcat/temp",
+        "org.apache.catalina.startup.Bootstrap",
+        "start"
+      ],
+      "args_count": 14,
+      "command_line": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java -Djava.util.logging.config.file=/opt/tomcat/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Djdk.tls.ephemeralDHKeySize=2048 -Djava.protocol.handler.pkgs=org.apache.catalina.webresources -Dorg.apache.catalina.security.SecurityListener.UMASK=0027 -Dignore.endorsed.dirs= -classpath /opt/tomcat/bin/bootstrap.jar:/opt/tomcat/bin/tomcat-juli.jar -Dcatalina.base=/opt/tomcat -Dcatalina.home=/opt/tomcat -Djava.io.tmpdir=/opt/tomcat/temp org.apache.catalina.startup.Bootstrap start",
+      "entity_id": "dG9tY2F0LWphdmEtcGFyZW50LWVudGl0eQ==",
+      "executable": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
+      "name": "java",
+      "pid": 2341,
+      "start": "2025-11-10T12:15:30.123Z",
+      "user": {
+        "id": "1001",
+        "name": "tomcat"
+      },
+      "working_directory": "/opt/tomcat"
+    },
+    "pid": 8742,
+    "start": "2025-11-10T15:34:22.847Z",
+    "working_directory": "/opt/tomcat"
+  },
+  "user": {
+    "Ext": {
+      "real": {
+        "id": "1001",
+        "name": "tomcat"
+      }
+    },
+    "id": "1001",
+    "name": "tomcat"
+  }
 }
