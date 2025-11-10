@@ -3,4 +3,4 @@ FROM logs-endpoint.events.*
   AND process.parent.name == "java"
   AND process.parent.command_line LIKE "*tomcat*"
   AND process.name IN ("bash", "sh", "dash", "zsh")
-  AND ("-c" IN process.args OR "-i" IN process.args)
+  AND (MV_CONTAINS(process.args, "-c") OR MV_CONTAINS(process.args, "-i"))
