@@ -106,5 +106,5 @@ variable "github_owner" {
 variable "fork_name" {
   description = "Name for the forked detection-rules repository"
   type        = string
-  default     = "detection-rules"
+  default     = "security-demo-detection-rules"
 }
