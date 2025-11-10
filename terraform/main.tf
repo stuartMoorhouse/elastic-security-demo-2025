@@ -241,9 +241,9 @@ resource "aws_instance" "red" {
               chmod 755 msfinstall
               ./msfinstall
 
-              # Initialize Metasploit database
+              # Initialize Metasploit database (must run as ubuntu user)
               echo "[5/6] Initializing Metasploit database..."
-              msfdb init
+              su - ubuntu -c "msfdb init" || echo "Note: Database initialization skipped (run 'msfdb init' manually after login)"
 
               # Install additional tools
               echo "[6/6] Installing additional tools..."
@@ -263,7 +263,7 @@ resource "aws_instance" "red" {
               Server Information:
                 Hostname: $(hostname)
                 Private IP: $(hostname -I | awk '{print $1}')
-                Public IP: ${aws_instance.red.public_ip}
+                Public IP: $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "N/A")
 
               Installed Tools:
                 - Metasploit Framework (msfconsole)
@@ -452,7 +452,7 @@ resource "aws_instance" "blue" {
               Server Information:
                 Hostname: $(hostname)
                 Private IP: $${PRIVATE_IP}
-                Public IP: ${aws_instance.blue.public_ip}
+                Public IP: $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "N/A")
 
               Tomcat Configuration:
                 Version: 9.0.30 (VULNERABLE)
