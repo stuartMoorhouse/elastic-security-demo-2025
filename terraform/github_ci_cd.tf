@@ -156,11 +156,18 @@ resource "null_resource" "setup_github_secrets" {
 
       # Create API key for Development cluster
       echo "Creating API key for ec-dev deployment..."
-      DEV_API_KEY=$(curl -u elastic:${ec_deployment.dev.elasticsearch_password} \
+
+      # Use environment variable to avoid password exposure in process listings
+      export ELASTIC_PASSWORD="${ec_deployment.dev.elasticsearch_password}"
+
+      DEV_API_KEY=$(curl -u "elastic:$${ELASTIC_PASSWORD}" \
         -X POST "${ec_deployment.dev.elasticsearch.https_endpoint}/_security/api_key" \
         -H "Content-Type: application/json" \
         -d '{"name":"github-actions-dev","role_descriptors":{"detection_rules":{"cluster":["all"],"index":[{"names":["*"],"privileges":["all"]}],"applications":[{"application":"kibana-.kibana","privileges":["all"],"resources":["*"]}]}}}' \
         2>/dev/null | jq -r '.encoded')
+
+      # Clear the password from environment
+      unset ELASTIC_PASSWORD
 
       if [ -z "$${DEV_API_KEY}" ] || [ "$${DEV_API_KEY}" == "null" ]; then
         echo "ERROR: Failed to create API key for ec-dev"

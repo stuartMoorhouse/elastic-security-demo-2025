@@ -8,7 +8,7 @@ aws_instance_type = "t3.large" # 8GB RAM for VMs (2 vCPU, 8GB RAM)
 # Elastic Cloud Configuration
 ec_region                = "us-east-1"
 elastic_version          = "9.2.0"
-deployment_template_id   = "aws-io-optimized-v2"
+deployment_template_id   = "aws-storage-optimized"  # Updated from deprecated aws-io-optimized-v2
 elasticsearch_size       = "8g" # 8GB RAM as per requirements
 elasticsearch_zone_count = 1
 kibana_size              = "1g"

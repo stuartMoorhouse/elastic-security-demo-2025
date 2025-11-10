@@ -5,7 +5,7 @@ output "red_vm" {
     instance_id = aws_instance.red.id
     public_ip   = aws_instance.red.public_ip
     private_ip  = aws_instance.red.private_ip
-    ssh_command = "ssh -i ~/.ssh/id_rsa ubuntu@${aws_instance.red.public_ip}"
+    ssh_command = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.red.public_ip}"
   }
 }
 
@@ -15,7 +15,7 @@ output "blue_vm" {
     instance_id = aws_instance.blue.id
     public_ip   = aws_instance.blue.public_ip
     private_ip  = aws_instance.blue.private_ip
-    ssh_command = "ssh -i ~/.ssh/id_rsa ubuntu@${aws_instance.blue.public_ip}"
+    ssh_command = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.blue.public_ip}"
   }
 }
 
@@ -76,10 +76,10 @@ output "quick_start" {
     ====================================
 
     1. SSH to Red Team VM (red-01):
-       ${aws_instance.red.public_ip != "" ? "ssh -i ~/.ssh/id_rsa ubuntu@${aws_instance.red.public_ip}" : "Instance starting..."}
+       ${aws_instance.red.public_ip != "" ? "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.red.public_ip}" : "Instance starting..."}
 
     2. SSH to Blue Team VM (blue-01):
-       ${aws_instance.blue.public_ip != "" ? "ssh -i ~/.ssh/id_rsa ubuntu@${aws_instance.blue.public_ip}" : "Instance starting..."}
+       ${aws_instance.blue.public_ip != "" ? "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.blue.public_ip}" : "Instance starting..."}
 
     3. Access Kibana (Local - for rule development):
        ${ec_deployment.local.kibana.https_endpoint}

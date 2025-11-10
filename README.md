@@ -74,7 +74,7 @@ This project automates the deployment of a complete security demonstration envir
 - [Terraform](https://www.terraform.io/downloads) >= 1.0
 - [AWS CLI](https://aws.amazon.com/cli/) configured with credentials
 - [GitHub CLI](https://cli.github.com/) (gh) authenticated
-- SSH key pair at `~/.ssh/id_rsa` and `~/.ssh/id_rsa.pub`
+- SSH key pair at `~/.ssh/id_ed25519` and `~/.ssh/id_ed25519.pub`
 
 ### Required Accounts
 
@@ -360,7 +360,7 @@ terraform plan  # Should show no changes
 **Solutions:**
 1. Wait 2-3 minutes for instances to fully boot
 2. Verify security group allows your IP: `terraform apply` updates this
-3. Check SSH key: `ssh-add ~/.ssh/id_rsa`
+3. Check SSH key: `ssh-add ~/.ssh/id_ed25519`
 
 ### GitHub Fork Fails
 
