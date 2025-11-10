@@ -1,0 +1,91 @@
+{
+  "@timestamp": "2025-11-10T15:34:22.847Z",
+  "ecs": {
+    "version": "8.11.0"
+  },
+  "event": {
+    "kind": "event",
+    "category": ["process"],
+    "type": ["start"],
+    "action": "exec",
+    "dataset": "endpoint.events.process",
+    "module": "endpoint",
+    "outcome": "success"
+  },
+  "host": {
+    "hostname": "blue-01",
+    "name": "blue-01",
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "ip": ["10.0.1.50", "172.17.0.1"],
+    "mac": ["02:42:ac:11:00:02"],
+    "os": {
+      "type": "linux",
+      "platform": "ubuntu",
+      "name": "Ubuntu",
+      "family": "debian",
+      "version": "20.04.6 LTS (Focal Fossa)",
+      "kernel": "5.15.0-1052-aws"
+    },
+    "architecture": "x86_64"
+  },
+  "agent": {
+    "id": "b1c2d3e4-f5a6-7890-bcde-f12345678901",
+    "type": "endpoint",
+    "version": "8.11.0"
+  },
+  "user": {
+    "id": "1001",
+    "name": "tomcat",
+    "group": {
+      "id": "1001",
+      "name": "tomcat"
+    }
+  },
+  "process": {
+    "pid": 8742,
+    "name": "bash",
+    "executable": "/usr/bin/bash",
+    "args": ["bash", "-c", "id"],
+    "args_count": 3,
+    "command_line": "bash -c id",
+    "working_directory": "/opt/tomcat",
+    "start": "2025-11-10T15:34:22.847Z",
+    "entity_id": "MTIzNDU2Nzg5MGFiY2RlZi0xMjM0NTY3ODkw",
+    "hash": {
+      "sha256": "7d7e0b6c3c7c7c0f7e5c5e3c0b5c7c0e3e3c0e5c7c0e3e3c0e5c7c0e3e3c0e5c"
+    },
+    "parent": {
+      "pid": 2341,
+      "name": "java",
+      "executable": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
+      "args": [
+        "/usr/lib/jvm/java-11-openjdk-amd64/bin/java",
+        "-Djava.util.logging.config.file=/opt/tomcat/conf/logging.properties",
+        "-Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager",
+        "-Djdk.tls.ephemeralDHKeySize=2048",
+        "-Djava.protocol.handler.pkgs=org.apache.catalina.webresources",
+        "-Dorg.apache.catalina.security.SecurityListener.UMASK=0027",
+        "-Dignore.endorsed.dirs=",
+        "-classpath",
+        "/opt/tomcat/bin/bootstrap.jar:/opt/tomcat/bin/tomcat-juli.jar",
+        "-Dcatalina.base=/opt/tomcat",
+        "-Dcatalina.home=/opt/tomcat",
+        "-Djava.io.tmpdir=/opt/tomcat/temp",
+        "org.apache.catalina.startup.Bootstrap",
+        "start"
+      ],
+      "command_line": "/usr/lib/jvm/java-11-openjdk-amd64/bin/java -Djava.util.logging.config.file=/opt/tomcat/conf/logging.properties -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager -Djdk.tls.ephemeralDHKeySize=2048 -Djava.protocol.handler.pkgs=org.apache.catalina.webresources -Dorg.apache.catalina.security.SecurityListener.UMASK=0027 -Dignore.endorsed.dirs= -classpath /opt/tomcat/bin/bootstrap.jar:/opt/tomcat/bin/tomcat-juli.jar -Dcatalina.base=/opt/tomcat -Dcatalina.home=/opt/tomcat -Djava.io.tmpdir=/opt/tomcat/temp org.apache.catalina.startup.Bootstrap start",
+      "start": "2025-11-10T12:15:30.123Z",
+      "entity_id": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXow",
+      "user": {
+        "id": "1001",
+        "name": "tomcat"
+      }
+    }
+  },
+  "data_stream": {
+    "type": "logs",
+    "dataset": "endpoint.events.process",
+    "namespace": "default"
+  }
+}
