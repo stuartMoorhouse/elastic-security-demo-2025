@@ -43,14 +43,25 @@ fi
 
 # Get Elasticsearch endpoint and password from terraform
 print_info "Getting Elasticsearch credentials from Terraform..."
-cd terraform
 
-if [ ! -f "terraform.tfstate" ]; then
+# Determine if we need to cd to terraform directory
+if [ -d "terraform" ]; then
+    cd terraform
+elif [ -f "../state/terraform.tfstate" ]; then
+    # Already in terraform directory or subdirectory
+    :
+else
     print_error "Terraform state not found. Have you run 'terraform apply'?"
     exit 1
 fi
 
-ES_ENDPOINT=$(terraform output -raw elastic_local_elasticsearch_endpoint 2>/dev/null)
+# Check for state file
+if [ ! -f "../state/terraform.tfstate" ] && [ ! -f "terraform.tfstate" ]; then
+    print_error "Terraform state not found. Have you run 'terraform apply'?"
+    exit 1
+fi
+
+ES_ENDPOINT=$(terraform output -json elastic_local 2>/dev/null | jq -r '.elasticsearch_url')
 ES_PASSWORD=$(terraform output -raw elastic_local_password 2>/dev/null)
 
 if [ -z "$ES_ENDPOINT" ] || [ -z "$ES_PASSWORD" ]; then
@@ -59,7 +70,8 @@ if [ -z "$ES_ENDPOINT" ] || [ -z "$ES_PASSWORD" ]; then
     exit 1
 fi
 
-cd ..
+# Return to project root
+cd "$(git rev-parse --show-toplevel 2>/dev/null || echo ..)"
 
 print_info "Elasticsearch endpoint: $ES_ENDPOINT"
 print_info "Using elastic user credentials"
@@ -153,7 +165,7 @@ if [ $fail_count -eq 0 ]; then
     print_info "✓ All test data ingested successfully!"
     echo ""
     print_info "Next steps:"
-    echo "  1. Open Local Kibana: $(cd terraform && terraform output -raw elastic_local_kibana_url)"
+    echo "  1. Open Local Kibana: $(cd terraform && terraform output -json elastic_local | jq -r '.kibana_url')"
     echo "  2. Navigate to: Security → Rules → Detection rules (SIEM)"
     echo "  3. Create the Tomcat webshell detection rule"
     echo "  4. Query: copy from demo-script/tomcat-webshell-rule-query.eql"
