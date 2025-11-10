@@ -15,115 +15,142 @@ RED_TEAM_IP="10.0.1.100"    # Replace with your red team VM private IP
 BLUE_TEAM_IP="10.0.1.50"    # Replace with your blue team VM private IP
 
 ################################################################################
-# PHASE 1: DETECTION ENGINEERING
-# Duration: 10-12 minutes
-# Goal: Create, test, and deploy a custom detection rule
+# PHASE 1: DETECTION AS CODE WORKFLOW
+# Duration: 12-15 minutes
+# Goal: Create, test, and deploy custom detection rule using GitOps workflow
 ################################################################################
 
-## 1.1 - Navigate to detection-rules repository
-cd ~/detection-rules
-source .venv/bin/activate
+## Step 1: Create Rule in Local Kibana (ec-local)
 
-## 1.2 - Explore repository structure (optional - for context)
-ls -la
-ls rules/
-ls rules/linux/ | wc -l    # Show count of Linux rules
+# Open Local Kibana in browser:
+# URL: [ec-local Kibana URL from terraform output]
+# Login: elastic / [password from terraform output elastic_local_password]
 
-## 1.3 - Examine an existing OOTB rule
-cat rules/linux/execution_suspicious_java_child_process.toml
+# Navigate to: Security → Rules → Detection rules (SIEM)
+# Click: "Create new rule"
 
-# This rule will fire during our demo - it detects Java spawning shells
-# Key sections: metadata, rule definition, EQL query, MITRE mapping
+# Rule Type: Event Correlation (EQL)
 
-## 1.4 - Create custom Tomcat web shell detection rule
-mkdir -p rules/custom
+# Configure using metadata from: demo-script/tomcat-webshell-rule-metadata.md
+# - Name: Tomcat Manager Web Shell Deployment
+# - Description: [copy from metadata file]
+# - Severity: High
+# - Risk Score: 73
+# - Index Pattern: logs-endpoint.events.*
 
-# Create the rule file
-cat > rules/custom/tomcat_webshell_detection.toml << 'EOF'
-[metadata]
-creation_date = "2025/11/06"
-integration = ["endpoint"]
-maturity = "production"
-updated_date = "2025/11/06"
+# EQL Query: Copy from demo-script/tomcat-webshell-rule-query.eql
+# Paste the query into the query builder
 
-[rule]
-author = ["Elastic", "Stuart"]
-description = """
-Detects web shell deployment via Apache Tomcat Manager interface. 
-Identifies when the Tomcat Java process spawns shell interpreters,
-indicating potential exploitation of weak credentials or vulnerabilities.
-"""
-from = "now-9m"
-index = ["logs-endpoint.events.*"]
-language = "eql"
-license = "Elastic License v2"
-name = "Tomcat Manager Web Shell Deployment"
-risk_score = 73
-rule_id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-severity = "high"
-tags = [
-    "Domain: Endpoint",
-    "OS: Linux",
-    "Use Case: Threat Detection",
-    "Tactic: Initial Access",
-    "Tactic: Execution",
-    "Data Source: Elastic Defend"
-]
-timestamp_override = "event.ingested"
-type = "eql"
+# Configure Schedule:
+# - Runs every: 5 minutes
+# - Additional look-back time: 9 minutes (from = "now-9m")
 
-query = '''
-process where event.type == "start" and
-  process.parent.name == "java" and
-  process.parent.command_line : "*tomcat*" and
-  process.name in ("bash", "sh", "dash", "zsh") and
-  process.args in ("-c", "-i")
-'''
+# Add Tags:
+# - Domain: Endpoint
+# - OS: Linux
+# - Use Case: Threat Detection
+# - Tactic: Initial Access
+# - Tactic: Execution
+# - Data Source: Elastic Defend
 
-[[rule.threat]]
-framework = "MITRE ATT&CK"
+# MITRE ATT&CK Mapping:
+# - T1190: Exploit Public-Facing Application
+# - T1505.003: Web Shell
 
-[[rule.threat.technique]]
-id = "T1190"
-name = "Exploit Public-Facing Application"
-reference = "https://attack.mitre.org/techniques/T1190/"
+# Save and enable the rule
 
-[[rule.threat.technique]]
-id = "T1505"
-name = "Server Software Component"
-reference = "https://attack.mitre.org/techniques/T1505/"
+## Step 2: Export Rule Using detection-rules CLI
 
-[[rule.threat.technique.subtechnique]]
-id = "T1505.003"
-name = "Web Shell"
-reference = "https://attack.mitre.org/techniques/T1505/003/"
+# On local machine (with detection-rules installed):
+cd ~/security-demo-detection-rules
+source ../.venv/bin/activate  # Or wherever you installed detection-rules
 
-[rule.threat.tactic]
-id = "TA0001"
-name = "Initial Access"
-reference = "https://attack.mitre.org/tactics/TA0001/"
-EOF
+# Get the rule ID from Local Kibana:
+# Security → Rules → Click on "Tomcat Manager Web Shell Deployment" → Copy Rule ID
 
-## 1.5 - Validate rule syntax
-python -m detection_rules test rules/custom/tomcat_webshell_detection.toml
+# Export the rule:
+python -m detection_rules kibana \
+  --cloud-id="[LOCAL_CLOUD_ID from terraform output]" \
+  --api-key="[Create API key in Local Kibana: Stack Management → API keys]" \
+  export-rules \
+  --rule-id "[RULE_ID from Kibana UI]" \
+  -o custom-rules/rules/
+
+# This creates: custom-rules/rules/tomcat_webshell_detection.toml
+
+## Step 3: Test Rule Locally
+
+# Validate rule syntax:
+python -m detection_rules test custom-rules/rules/tomcat_webshell_detection.toml
 # Expected: ✓ Rule validation successful
 
-## 1.6 - View rule details
-python -m detection_rules view-rule rules/custom/tomcat_webshell_detection.toml
+# View rule details:
+python -m detection_rules view-rule custom-rules/rules/tomcat_webshell_detection.toml
 
-## 1.7 - Deploy rule to Kibana
-python -m detection_rules kibana upload-rule rules/custom/tomcat_webshell_detection.toml
-# Expected: ✓ Rule uploaded successfully
+## Step 4: Commit and Push to Feature Branch
 
-# Verify in UI: Security → Rules → Search "Tomcat Manager"
+# Create feature branch:
+git checkout -b feature/tomcat-webshell-detection
+
+# Add the rule:
+git add custom-rules/rules/tomcat_webshell_detection.toml
+
+# Commit with descriptive message:
+git commit -m "feat: Add Tomcat web shell detection rule
+
+- Detects Java/Tomcat spawning shell processes
+- Maps to MITRE ATT&CK T1190, T1505.003
+- High severity, risk score 73"
+
+# Push to remote:
+git push origin feature/tomcat-webshell-detection
+
+## Step 5: Pull Request Auto-Created
+
+# GitHub Actions automatically creates a PR to dev branch
+# Check GitHub repository in browser to see the PR
+# PR includes:
+# - Checklist for review
+# - Automatic validation results
+
+## Step 6: Review and Approve PR
+
+# In GitHub UI:
+# 1. Navigate to Pull Requests tab
+# 2. Click on auto-created PR
+# 3. Review the rule changes
+# 4. Check that validation passed (green checkmark)
+# 5. Approve the PR
+# 6. Click "Merge pull request"
+# 7. Confirm merge
+
+## Step 7: Automatic Deployment to Dev Kibana
+
+# GitHub Actions automatically deploys the rule to Development environment (ec-dev)
+# Monitor deployment: GitHub → Actions tab → "Deploy to Development" workflow
+#
+# When workflow completes:
+# - Rule is deployed to Dev Kibana (ec-dev)
+# - Rule is enabled and ready to detect attacks
+
+# Verify deployment:
+# Open Dev Kibana: [ec-dev Kibana URL from terraform output]
+# Navigate to: Security → Rules → Search "Tomcat Manager"
+# The rule should be present and enabled
 
 ################################################################################
-# PHASE 2: ENABLE OOTB DETECTION RULES
+# PHASE 2: ENABLE OOTB DETECTION RULES IN DEV KIBANA
 # Duration: 2-3 minutes
 # Goal: Activate prebuilt rules for comprehensive coverage
 ################################################################################
 
-# In Elastic Security UI (browser):
+## Step 8: Add OOTB Rules in Dev Kibana (ec-dev)
+
+# Open Dev Kibana in browser:
+# URL: [ec-dev Kibana URL from terraform output]
+# Login: elastic / [password from terraform output elastic_dev_password]
+
+# In Elastic Security UI:
 # 1. Navigate to: Security → Rules → Detection rules (SIEM)
 # 2. Filter: Status = "Disabled", Tags contains "Linux"
 # 3. Enable these rules (bulk select):
@@ -135,6 +162,8 @@ python -m detection_rules kibana upload-rule rules/custom/tomcat_webshell_detect
 #    ☑ Indicator Removal - Clear Command History
 # 4. Bulk actions → Enable
 # 5. View MITRE ATT&CK coverage map
+
+# Note: These OOTB rules complement the custom Tomcat rule deployed via GitOps
 
 ################################################################################
 # PHASE 3: EXECUTE ATTACK CHAIN
@@ -438,9 +467,9 @@ curl -u tomcat:tomcat http://$BLUE_TEAM_IP:8080/manager/text/list
 ## Verify Metasploit database
 sudo msfdb status
 
-## Verify detection-rules
-cd ~/detection-rules
-source .venv/bin/activate
+## Verify detection-rules CLI
+cd ~/security-demo-detection-rules
+source ../.venv/bin/activate  # Or wherever you installed detection-rules
 python -m detection_rules --help
 
 ## Check Elastic Agent on blue team VM
@@ -456,11 +485,17 @@ sessions -l                  # List sessions
 sessions -i 1                # Reconnect to session 1
 exploit                      # Re-exploit if needed
 
-## If detection-rules fails
-cd ~/detection-rules
-deactivate
-source .venv/bin/activate
-python -m detection_rules kibana upload-rule rules/custom/tomcat_webshell_detection.toml
+## If rule deployment fails
+# Check GitHub Actions workflow status:
+# GitHub → Actions tab → Check "Deploy to Development" workflow
+
+# If workflow failed, you can manually deploy:
+cd ~/security-demo-detection-rules
+source ../.venv/bin/activate
+python -m detection_rules kibana \
+  --cloud-id="[DEV_CLOUD_ID from terraform output]" \
+  --api-key="[Create API key in Dev Kibana]" \
+  import-rules -d custom-rules/rules/
 
 ## If connectivity fails
 ping $BLUE_TEAM_IP
@@ -472,14 +507,18 @@ nc -zv $BLUE_TEAM_IP 8080
 # DEMO SUMMARY
 ################################################################################
 
-# Phase 1: Detection Engineering
-#   - Created custom Tomcat web shell detection rule
+# Phase 1: Detection as Code Workflow (GitOps)
+#   - Created custom rule in Local Kibana UI (ec-local)
+#   - Exported rule using detection-rules CLI
 #   - Tested locally with detection-rules framework
-#   - Deployed to Kibana via API
-#   - Demonstrated Detection as Code workflow
+#   - Committed to feature branch
+#   - Automatic PR creation to dev branch
+#   - PR validation and approval
+#   - Automatic deployment to Dev Kibana (ec-dev)
+#   - Demonstrated complete GitOps workflow
 
 # Phase 2: OOTB Rules
-#   - Enabled 6+ prebuilt Linux detection rules
+#   - Enabled 6+ prebuilt Linux detection rules in Dev Kibana
 #   - Showed MITRE ATT&CK coverage map
 #   - Demonstrated comprehensive detection library
 
@@ -501,25 +540,30 @@ nc -zv $BLUE_TEAM_IP 8080
 # NOTES
 ################################################################################
 
-# Total Demo Time: 30-35 minutes
-# - Detection Engineering: 10-12 min
+# Total Demo Time: 32-40 minutes
+# - Detection as Code Workflow (GitOps): 12-15 min
 # - Enable OOTB Rules: 2-3 min
 # - Attack Chain: 8-10 min
 # - Case Management: 10-12 min
 
 # Key Differentiators:
-# - Detection as Code (version control, testing, CI/CD)
+# - Detection as Code with GitOps (version control, testing, PR workflow, CI/CD)
+# - Dual environment approach (Local for dev, Dev for testing)
+# - Automated PR creation and deployment
 # - 2000+ prebuilt rules (all open source)
 # - Complete MITRE ATT&CK coverage
 # - Elastic 9.2 case enhancements
 # - Single platform (detection → investigation → response)
 
 # Customer Value:
-# - Faster detection engineering with code-based workflows
+# - Faster detection engineering with GitOps workflow
+# - Code review process for detection rules (quality assurance)
 # - Reduced false positives with tested, peer-reviewed rules
+# - Automated deployment reduces manual errors
 # - Improved analyst efficiency (auto-extract observables)
 # - Better team communication (human-readable case IDs)
 # - Complete investigation documentation for compliance
+# - Separation of dev/test environments prevents production impact
 
 ################################################################################
 # END OF SCRIPT
