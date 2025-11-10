@@ -1,0 +1,5 @@
+process where event.type == "start" and
+  process.parent.name == "java" and
+  process.parent.command_line : "*tomcat*" and
+  process.name in ("bash", "sh", "dash", "zsh") and
+  process.args in ("-c", "-i")

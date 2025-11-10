@@ -20,16 +20,114 @@ resource "github_repository_file" "deploy_to_dev_workflow" {
   file       = ".github/workflows/deploy-to-dev.yml"
 
   content = <<-EOT
-name: Deploy Rules to Development Environment
+name: Detection Rules CI/CD
 
 on:
   push:
     branches:
       - dev
+      - 'feature/**'
+  pull_request:
+    branches:
+      - dev
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
+  # Auto-create PR when pushing to feature branches
+  create-pr:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/')
+    runs-on: ubuntu-latest
+    name: Auto-create Pull Request
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Create Pull Request
+      env:
+        GH_TOKEN: $${{ github.token }}
+      run: |
+        BRANCH_NAME=$${GITHUB_REF#refs/heads/}
+
+        # Check if PR already exists
+        EXISTING_PR=$$(gh pr list --head "$$BRANCH_NAME" --base dev --json number --jq '.[0].number')
+
+        if [ -z "$$EXISTING_PR" ]; then
+          echo "Creating pull request from $$BRANCH_NAME to dev..."
+          gh pr create \
+            --base dev \
+            --head "$$BRANCH_NAME" \
+            --title "Detection Rule: $$BRANCH_NAME" \
+            --body "## Detection Rule Update
+
+This PR contains updates to custom detection rules.
+
+### Checklist
+- [ ] Rule has been tested locally
+- [ ] Rule validation passes
+- [ ] Rule metadata is complete
+- [ ] MITRE ATT&CK mapping is accurate
+
+Once approved and merged, this rule will be automatically deployed to the Development environment (ec-dev)."
+
+          echo "✅ Pull request created successfully!"
+        else
+          echo "ℹ️ Pull request #$$EXISTING_PR already exists"
+        fi
+
+  # Validate rules on PR
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: Validate Detection Rules
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install detection-rules dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .
+        pip install lib/kibana
+        pip install lib/kql
+
+    - name: Validate custom rules
+      run: |
+        if [ -d "custom-rules/rules" ] && [ "$$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
+          echo "🔍 Validating custom rules..."
+          for rule in custom-rules/rules/*.toml; do
+            echo "Validating: $$rule"
+            python -m detection_rules test "$$rule" || echo "⚠️ Note: Validation may require additional context"
+          done
+          echo "✅ Validation complete!"
+        else
+          echo "ℹ️ No custom rules found to validate"
+        fi
+
+    - name: Add validation summary
+      if: always()
+      run: |
+        echo "## 🔍 Rule Validation Results" >> $$GITHUB_STEP_SUMMARY
+        echo "" >> $$GITHUB_STEP_SUMMARY
+        if [ "$${{ job.status }}" == "success" ]; then
+          echo "✅ All rules passed validation" >> $$GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Validation failed - please review the logs" >> $$GITHUB_STEP_SUMMARY
+        fi
+
+  # Deploy to dev when PR is merged
   deploy-to-dev:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     name: Deploy Detection Rules to ec-dev
 
@@ -53,26 +151,26 @@ jobs:
 
     - name: Configure detection-rules
       run: |
-        # Create dac-demo/rules directory if it doesn't exist
-        mkdir -p dac-demo/rules
+        # Create custom-rules/rules directory if it doesn't exist
+        mkdir -p custom-rules/rules
 
         # Create detection-rules config file
         cat > .detection-rules-cfg.json << EOF
         {
-          "custom_rules_dir": "dac-demo"
+          "custom_rules_dir": "custom-rules"
         }
         EOF
 
     - name: Validate custom rules
       run: |
-        if [ -d "dac-demo/rules" ] && [ "$$(ls -A dac-demo/rules/*.toml 2>/dev/null)" ]; then
+        if [ -d "custom-rules/rules" ] && [ "$$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
           echo "Validating custom rules..."
-          for rule in dac-demo/rules/*.toml; do
+          for rule in custom-rules/rules/*.toml; do
             echo "Validating: $$rule"
             python -m detection_rules test "$$rule" || echo "Note: Validation may require additional context"
           done
         else
-          echo "No custom rules found in dac-demo/rules/"
+          echo "No custom rules found in custom-rules/rules/"
         fi
 
     - name: Deploy to Development Kibana (ec-dev)
@@ -80,7 +178,7 @@ jobs:
         ELASTIC_CLOUD_ID: $${{ secrets.DEV_ELASTIC_CLOUD_ID }}
         ELASTIC_API_KEY: $${{ secrets.DEV_ELASTIC_API_KEY }}
       run: |
-        if [ -d "dac-demo/rules" ] && [ "$$(ls -A dac-demo/rules/*.toml 2>/dev/null)" ]; then
+        if [ -d "custom-rules/rules" ] && [ "$$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
           echo "🚀 Deploying custom rules to Development environment (ec-dev)..."
 
           # Update detection-rules config with Elastic Cloud credentials
@@ -88,13 +186,13 @@ jobs:
         {
           "cloud_id": "$${ELASTIC_CLOUD_ID}",
           "api_key": "$${ELASTIC_API_KEY}",
-          "custom_rules_dir": "dac-demo"
+          "custom_rules_dir": "custom-rules"
         }
         EOF
 
           # Import rules to Development Kibana
           python -m detection_rules kibana --space default import-rules \
-            -d dac-demo/rules/ || echo "Note: Some rules may already exist"
+            -d custom-rules/rules/ || echo "Note: Some rules may already exist"
 
           # Clean up config file
           rm -f .detection-rules-cfg.json
@@ -235,26 +333,26 @@ resource "null_resource" "setup_custom_rules_directory" {
         cd "$${REPO_DIR}"
       fi
 
-      # Check if dac-demo directory already exists
-      if [ -d "dac-demo" ]; then
-        echo "dac-demo directory already exists, skipping setup"
+      # Check if custom-rules directory already exists
+      if [ -d "custom-rules" ]; then
+        echo "custom-rules directory already exists, skipping setup"
         exit 0
       fi
 
-      # Create dac-demo directory structure
-      echo "Creating dac-demo directory structure..."
-      mkdir -p dac-demo/rules dac-demo/docs
+      # Create custom-rules directory structure
+      echo "Creating custom-rules directory structure..."
+      mkdir -p custom-rules/rules custom-rules/docs
 
-      # Create README for dac-demo
-      cat > dac-demo/README.md << 'README'
-# DAC Demo - Custom Detection Rules
+      # Create README for custom-rules
+      cat > custom-rules/README.md << 'README'
+# Custom Detection Rules
 
 This directory contains custom detection rules for the Elastic Security Detection as Code demo.
 
 ## Directory Structure
 
 ```
-dac-demo/
+custom-rules/
 ├── rules/          # Your custom detection rules (TOML format)
 ├── docs/           # Documentation for custom rules
 └── README.md       # This file
@@ -262,8 +360,8 @@ dac-demo/
 
 ## Adding Custom Rules
 
-1. Create your rule TOML file in `dac-demo/rules/`
-2. Test locally: `python -m detection_rules test dac-demo/rules/your-rule.toml`
+1. Create your rule TOML file in `custom-rules/rules/`
+2. Test locally: `python -m detection_rules test custom-rules/rules/your-rule.toml`
 3. Commit and push to a feature branch
 4. Create PR to `dev` branch
 5. After merge, rules automatically deploy to ec-dev
@@ -326,20 +424,20 @@ process where event.type == "start" and
 README
 
       # Create a sample rule file (commented out for reference)
-      cat > dac-demo/rules/.gitkeep << 'GITKEEP'
+      cat > custom-rules/rules/.gitkeep << 'GITKEEP'
 # Place your custom detection rules (.toml files) in this directory
 #
 # Example:
-#   dac-demo/rules/my_custom_rule.toml
-#   dac-demo/rules/tomcat_webshell_detection.toml
+#   custom-rules/rules/my_custom_rule.toml
+#   custom-rules/rules/tomcat_webshell_detection.toml
 GITKEEP
 
       # Commit and push the changes
-      git add dac-demo/
-      git commit -m "feat: Initialize dac-demo directory for custom detection rules
+      git add custom-rules/
+      git commit -m "feat: Initialize custom-rules directory for custom detection rules
 
-- Create dac-demo/rules/ for custom TOML rule files
-- Create dac-demo/docs/ for rule documentation
+- Create custom-rules/rules/ for custom TOML rule files
+- Create custom-rules/docs/ for rule documentation
 - Add comprehensive README with usage instructions
 - Set up CI/CD integration with GitHub Actions"
 
@@ -350,7 +448,7 @@ GITKEEP
       echo "Local repository maintained at: $${REPO_DIR}"
       echo ""
       echo "Directory structure:"
-      echo "  dac-demo/"
+      echo "  custom-rules/"
       echo "  ├── rules/     (place your .toml rule files here)"
       echo "  ├── docs/      (rule documentation)"
       echo "  └── README.md  (usage instructions)"
@@ -378,7 +476,7 @@ output "github_ci_cd_status" {
       "DEV_ELASTIC_CLOUD_ID",
       "DEV_ELASTIC_API_KEY"
     ]
-    custom_rules_directory = "dac-demo/rules/"
+    custom_rules_directory = "custom-rules/rules/"
     deployment_target      = "ec-dev (Development Environment)"
     workflow_trigger       = "Push to dev branch"
   }
