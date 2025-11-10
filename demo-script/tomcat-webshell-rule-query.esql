@@ -1,0 +1,6 @@
+FROM logs-endpoint.events.*
+| WHERE event.type == "start"
+  AND process.parent.name == "java"
+  AND process.parent.command_line LIKE "*tomcat*"
+  AND process.name IN ("bash", "sh", "dash", "zsh")
+  AND ("-c" IN process.args OR "-i" IN process.args)

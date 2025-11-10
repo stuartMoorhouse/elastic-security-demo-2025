@@ -19,11 +19,13 @@ indicating potential exploitation of weak credentials or vulnerabilities.
 
 ## Rule Configuration
 
-**Rule Type:** Event Correlation (EQL)
+**Rule Type:** ES|QL (Recommended)
 
 **Index Pattern:** `logs-endpoint.events.*`
 
-**Query:** (see tomcat-webshell-rule-query.eql)
+**Query:** (see tomcat-webshell-rule-query.esql)
+
+**Note:** ES|QL is recommended for single-event queries like this. An EQL version is also available in `tomcat-webshell-rule-query.eql` for compatibility.
 
 **Runs every:** 5 minutes
 
