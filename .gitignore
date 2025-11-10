@@ -28,6 +28,9 @@ state/
 # Example terraform (contains secrets/credentials)
 example-terraform/
 
+# Detection rules repository (forked repo, managed separately)
+detection-rules/
+
 # Credentials and secrets
 **/credentials/
 **/*credentials*.json

@@ -137,10 +137,16 @@ terraform init
 terraform apply
 ```
 
-**Deployment time:** ~8-10 minutes
+**Deployment time:** ~10-15 minutes
 - AWS resources: ~2 minutes
+- VM automation (Metasploit + Tomcat): ~5-10 minutes (runs in background)
 - Elastic Cloud deployments: ~5 minutes (may timeout but continues in background)
-- GitHub fork: ~1 minute
+- GitHub fork and CI/CD: ~1-2 minutes
+
+**What gets automated:**
+- ✅ Red VM: Metasploit Framework, nmap, netcat, john, nikto
+- ✅ Blue VM: Vulnerable Tomcat 9.0.30, weak credentials, remote access enabled
+- ✅ Both VMs: Fully configured and verified on first boot
 
 **Important:** If Elastic Cloud deployments timeout after 2 minutes, this is expected behavior. Wait an additional 5 minutes, then run:
 
@@ -178,27 +184,53 @@ terraform output -json > ../deployment-info.json
 
 This is **required** for rule development and export.
 
-### 5. Set Up VMs
+### 5. Verify VM Setup
 
-Follow the detailed setup guides in the `instructions/` directory:
+**VMs are automatically configured during deployment!** SSH in to verify:
 
 **Red Team VM (red-01):**
 ```bash
 # SSH to red team VM
-ssh -i ~/.ssh/id_rsa ubuntu@<red-01-public-ip>
+ssh -i ~/.ssh/id_ed25519 ubuntu@<red-01-public-ip>
 
-# Follow instructions/red-vm.md
-# Installs: Metasploit, offensive tools (15-20 min)
+# Check setup status
+tail -f /var/log/elastic-demo-setup.log
+
+# View configuration
+cat ~/red-vm-info.txt
+
+# Verify Metasploit installation
+msfconsole --version
+
+# Already installed:
+# ✓ Metasploit Framework
+# ✓ nmap, netcat, john, nikto
+# ✓ PostgreSQL database initialized
 ```
 
 **Blue Team VM (blue-01):**
 ```bash
 # SSH to blue team VM
-ssh -i ~/.ssh/id_rsa ubuntu@<blue-01-public-ip>
+ssh -i ~/.ssh/id_ed25519 ubuntu@<blue-01-public-ip>
 
-# Follow instructions/blue-vm.md
-# Installs: Vulnerable Tomcat 9.0.30, Elastic Agent
+# Check setup status
+tail -f /var/log/elastic-demo-setup.log
+
+# View configuration
+cat ~/blue-vm-info.txt
+
+# Verify Tomcat is running
+sudo systemctl status tomcat
+curl http://localhost:8080
+
+# Already installed and configured:
+# ✓ Tomcat 9.0.30 (vulnerable)
+# ✓ Weak credentials (tomcat/tomcat)
+# ✓ Remote access enabled
+# ✓ Manager app accessible
 ```
+
+**Next step: Install Elastic Agent on blue-01** (see instructions/blue-vm.md for agent setup)
 
 ### 6. Run Purple Team Exercise
 
@@ -227,6 +259,12 @@ security-demo-2025/
 │   ├── red-vm.md               # Red team VM setup (Metasploit)
 │   ├── blue-vm.md              # Blue team VM setup (Tomcat + Agent)
 │   └── demo-execution-script.md # Purple team exercise workflow
+├── detection-rules/             # Forked detection-rules repo (gitignored, auto-cloned)
+│   ├── dac-demo/               # Custom detection rules directory
+│   │   ├── rules/              # Your custom .toml rule files
+│   │   ├── docs/               # Rule documentation
+│   │   └── README.md           # Usage instructions
+│   └── ...                     # Standard elastic/detection-rules structure
 └── example-terraform/           # Reference implementation
 ```
 

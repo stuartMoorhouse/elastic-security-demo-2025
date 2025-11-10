@@ -11,20 +11,20 @@ resource "ec_deployment" "local" {
   version                = data.ec_stack.latest.version
   deployment_template_id = var.deployment_template_id
 
-  elasticsearch {
-    hot {
+  elasticsearch = {
+    hot = {
       size        = var.elasticsearch_size
       zone_count  = var.elasticsearch_zone_count
-      autoscaling {}
+      autoscaling = {}
     }
   }
 
-  kibana {
+  kibana = {
     size       = var.kibana_size
     zone_count = var.kibana_zone_count
   }
 
-  integrations_server {
+  integrations_server = {
     size       = var.integrations_server_size
     zone_count = var.integrations_server_zone_count
   }
@@ -43,20 +43,20 @@ resource "ec_deployment" "dev" {
   version                = data.ec_stack.latest.version
   deployment_template_id = var.deployment_template_id
 
-  elasticsearch {
-    hot {
+  elasticsearch = {
+    hot = {
       size        = var.elasticsearch_size
       zone_count  = var.elasticsearch_zone_count
-      autoscaling {}
+      autoscaling = {}
     }
   }
 
-  kibana {
+  kibana = {
     size       = var.kibana_size
     zone_count = var.kibana_zone_count
   }
 
-  integrations_server {
+  integrations_server = {
     size       = var.integrations_server_size
     zone_count = var.integrations_server_zone_count
   }

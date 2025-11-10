@@ -24,10 +24,10 @@ output "elastic_local" {
   description = "Local Elastic Cloud deployment (for rule development)"
   value = {
     deployment_id      = ec_deployment.local.id
-    elasticsearch_url  = ec_deployment.local.elasticsearch[0].https_endpoint
-    kibana_url         = ec_deployment.local.kibana[0].https_endpoint
+    elasticsearch_url  = ec_deployment.local.elasticsearch.https_endpoint
+    kibana_url         = ec_deployment.local.kibana.https_endpoint
     elasticsearch_user = ec_deployment.local.elasticsearch_username
-    cloud_id           = ec_deployment.local.elasticsearch[0].cloud_id
+    cloud_id           = ec_deployment.local.elasticsearch.cloud_id
   }
   sensitive = false
 }
@@ -42,10 +42,10 @@ output "elastic_dev" {
   description = "Development Elastic Cloud deployment (for purple team exercise)"
   value = {
     deployment_id      = ec_deployment.dev.id
-    elasticsearch_url  = ec_deployment.dev.elasticsearch[0].https_endpoint
-    kibana_url         = ec_deployment.dev.kibana[0].https_endpoint
+    elasticsearch_url  = ec_deployment.dev.elasticsearch.https_endpoint
+    kibana_url         = ec_deployment.dev.kibana.https_endpoint
     elasticsearch_user = ec_deployment.dev.elasticsearch_username
-    cloud_id           = ec_deployment.dev.elasticsearch[0].cloud_id
+    cloud_id           = ec_deployment.dev.elasticsearch.cloud_id
   }
   sensitive = false
 }
@@ -60,17 +60,17 @@ output "elastic_dev_password" {
 output "github_repository" {
   description = "Forked detection-rules repository information"
   value = {
-    full_name  = data.github_repository.detection_rules.full_name
-    html_url   = data.github_repository.detection_rules.html_url
-    clone_url  = data.github_repository.detection_rules.http_clone_url
-    ssh_url    = data.github_repository.detection_rules.ssh_clone_url
+    full_name = data.github_repository.detection_rules.full_name
+    html_url  = data.github_repository.detection_rules.html_url
+    clone_url = data.github_repository.detection_rules.http_clone_url
+    ssh_url   = data.github_repository.detection_rules.ssh_clone_url
   }
 }
 
 # Quick Start Commands
 output "quick_start" {
   description = "Quick start commands for the purple team exercise"
-  value = <<-EOT
+  value       = <<-EOT
 
     ELASTIC SECURITY DEMO - QUICK START
     ====================================
@@ -82,12 +82,12 @@ output "quick_start" {
        ${aws_instance.blue.public_ip != "" ? "ssh -i ~/.ssh/id_rsa ubuntu@${aws_instance.blue.public_ip}" : "Instance starting..."}
 
     3. Access Kibana (Local - for rule development):
-       ${ec_deployment.local.kibana[0].https_endpoint}
+       ${ec_deployment.local.kibana.https_endpoint}
        User: ${ec_deployment.local.elasticsearch_username}
        Pass: Run 'terraform output elastic_local_password' to view
 
     4. Access Kibana (Dev - for purple team exercise):
-       ${ec_deployment.dev.kibana[0].https_endpoint}
+       ${ec_deployment.dev.kibana.https_endpoint}
        User: ${ec_deployment.dev.elasticsearch_username}
        Pass: Run 'terraform output elastic_dev_password' to view
 

@@ -58,7 +58,7 @@ variable "elastic_version" {
 variable "deployment_template_id" {
   description = "Elastic Cloud deployment template"
   type        = string
-  default     = "aws-io-optimized-v2"
+  default     = "aws-storage-optimized"
 }
 
 variable "elasticsearch_size" {

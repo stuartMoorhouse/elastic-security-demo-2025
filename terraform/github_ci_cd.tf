@@ -157,7 +157,7 @@ resource "null_resource" "setup_github_secrets" {
       # Create API key for Development cluster
       echo "Creating API key for ec-dev deployment..."
       DEV_API_KEY=$(curl -u elastic:${ec_deployment.dev.elasticsearch_password} \
-        -X POST "${ec_deployment.dev.elasticsearch[0].https_endpoint}/_security/api_key" \
+        -X POST "${ec_deployment.dev.elasticsearch.https_endpoint}/_security/api_key" \
         -H "Content-Type: application/json" \
         -d '{"name":"github-actions-dev","role_descriptors":{"detection_rules":{"cluster":["all"],"index":[{"names":["*"],"privileges":["all"]}],"applications":[{"application":"kibana-.kibana","privileges":["all"],"resources":["*"]}]}}}' \
         2>/dev/null | jq -r '.encoded')
@@ -171,7 +171,7 @@ resource "null_resource" "setup_github_secrets" {
       echo "Setting DEV_ELASTIC_CLOUD_ID secret..."
       gh secret set DEV_ELASTIC_CLOUD_ID \
         --repo "$${REPO}" \
-        --body "${ec_deployment.dev.elasticsearch[0].cloud_id}"
+        --body "${ec_deployment.dev.elasticsearch.cloud_id}"
 
       echo "Setting DEV_ELASTIC_API_KEY secret..."
       gh secret set DEV_ELASTIC_API_KEY \
@@ -191,9 +191,9 @@ resource "null_resource" "setup_github_secrets" {
 
   # Run this whenever the EC deployment changes
   triggers = {
-    dev_deployment_id  = ec_deployment.dev.id
-    dev_cloud_id       = ec_deployment.dev.elasticsearch[0].cloud_id
-    dev_kibana_url     = ec_deployment.dev.kibana[0].https_endpoint
+    dev_deployment_id = ec_deployment.dev.id
+    dev_cloud_id      = ec_deployment.dev.elasticsearch.cloud_id
+    dev_kibana_url    = ec_deployment.dev.kibana.https_endpoint
   }
 
   depends_on = [
@@ -212,23 +212,25 @@ resource "null_resource" "setup_custom_rules_directory" {
       echo "Setting up custom rules directory structure..."
 
       REPO_NAME="${var.fork_name}"
-      TEMP_DIR="/tmp/$${REPO_NAME}-setup"
+      PROJECT_DIR="${path.module}/.."
+      REPO_DIR="$${PROJECT_DIR}/$${REPO_NAME}"
       GITHUB_USER="${var.github_owner}"
 
-      # Clean up any existing temp directory
-      rm -rf "$${TEMP_DIR}"
-
-      # Clone the repository
-      echo "Cloning repository..."
-      git clone "https://github.com/$${GITHUB_USER}/$${REPO_NAME}.git" "$${TEMP_DIR}"
-
-      cd "$${TEMP_DIR}"
+      # Check if repository already exists locally
+      if [ -d "$${REPO_DIR}/.git" ]; then
+        echo "Local repository already exists at $${REPO_DIR}"
+        cd "$${REPO_DIR}"
+        git pull origin main || echo "Warning: Could not pull latest changes"
+      else
+        # Clone the repository to project directory
+        echo "Cloning repository to $${REPO_DIR}..."
+        git clone --depth 1 "https://github.com/$${GITHUB_USER}/$${REPO_NAME}.git" "$${REPO_DIR}"
+        cd "$${REPO_DIR}"
+      fi
 
       # Check if dac-demo directory already exists
       if [ -d "dac-demo" ]; then
         echo "dac-demo directory already exists, skipping setup"
-        cd ..
-        rm -rf "$${TEMP_DIR}"
         exit 0
       fi
 
@@ -337,11 +339,8 @@ GITKEEP
       echo "Pushing changes to main branch..."
       git push origin main
 
-      # Clean up
-      cd ..
-      rm -rf "$${TEMP_DIR}"
-
       echo "✅ Custom rules directory structure created successfully!"
+      echo "Local repository maintained at: $${REPO_DIR}"
       echo ""
       echo "Directory structure:"
       echo "  dac-demo/"
@@ -366,15 +365,15 @@ GITKEEP
 output "github_ci_cd_status" {
   description = "GitHub CI/CD configuration summary"
   value = {
-    dev_branch_created       = true
-    workflow_file            = github_repository_file.deploy_to_dev_workflow.file
+    dev_branch_created = true
+    workflow_file      = github_repository_file.deploy_to_dev_workflow.file
     github_secrets_configured = [
       "DEV_ELASTIC_CLOUD_ID",
       "DEV_ELASTIC_API_KEY"
     ]
-    custom_rules_directory   = "dac-demo/rules/"
-    deployment_target        = "ec-dev (Development Environment)"
-    workflow_trigger         = "Push to dev branch"
+    custom_rules_directory = "dac-demo/rules/"
+    deployment_target      = "ec-dev (Development Environment)"
+    workflow_trigger       = "Push to dev branch"
   }
 
   depends_on = [
