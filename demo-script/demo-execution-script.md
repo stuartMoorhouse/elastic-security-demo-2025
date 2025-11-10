@@ -16,15 +16,12 @@ BLUE_TEAM_IP="10.0.1.50"    # Replace with your blue team VM private IP
 
 ################################################################################
 # PHASE 1: DETECTION AS CODE WORKFLOW
-# Duration: 12-15 minutes
 # Goal: Create, test, and deploy custom detection rule using GitOps workflow
 ################################################################################
 
 ## Step 1: Create Rule in Local Kibana (ec-local)
 
-# Open Local Kibana in browser:
-# URL: [ec-local Kibana URL from terraform output]
-# Login: elastic / [password from terraform output elastic_local_password]
+# Open Local Kibana in browser
 
 # Navigate to: Security → Rules → Detection rules (SIEM)
 # Click: "Create new rule"
