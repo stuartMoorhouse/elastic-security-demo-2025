@@ -121,6 +121,15 @@ resource "aws_security_group" "blue" {
     cidr_blocks = [var.allowed_ssh_cidr]
   }
 
+  # Tomcat HTTP access from allowed CIDR (for verification and demos)
+  ingress {
+    description = "Tomcat HTTP from allowed CIDR"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = [var.allowed_ssh_cidr]
+  }
+
   # All outbound traffic
   egress {
     description = "All outbound traffic"

@@ -21,7 +21,7 @@ This project automates the deployment of a complete security demonstration envir
 |  - Ubuntu 22.04           |      - Ubuntu 22.04                  |
 |  - Metasploit             |      - Vulnerable Tomcat 9.0.30      |
 |  - Offensive tools        |      - Elastic Agent (dev)           |
-|  - 8GB RAM (t3.large)     |      - 8GB RAM (t3.large)            |
+|  - 4GB RAM (t3.medium)    |      - 4GB RAM (t3.medium)           |
 +---------------------------+--------------------------------------+
                                     |
                                     v
@@ -186,7 +186,32 @@ This is **required** for rule development and export.
 
 ### 5. Verify VM Setup
 
-**VMs are automatically configured during deployment!** SSH in to verify:
+**VMs are automatically configured during deployment!**
+
+#### Automated Verification (Recommended)
+
+Run the verification script from your local machine:
+
+```bash
+# From project root directory
+./verify-demo-setup.sh
+```
+
+This script checks:
+- ✓ SSH connectivity to both VMs
+- ✓ Metasploit installation and database on red-01
+- ✓ Tomcat installation and configuration on blue-01
+- ✓ Network connectivity between VMs
+- ✓ Elastic Cloud deployments accessible
+- ✓ GitHub repository and CI/CD setup
+- ✓ Tomcat Manager with weak credentials
+- ✓ All required tools and services
+
+**Wait 2-3 minutes after `terraform apply` completes** for VM initialization scripts to finish, then run the verification script.
+
+#### Manual Verification
+
+You can also manually verify by SSHing to the VMs:
 
 **Red Team VM (red-01):**
 ```bash

