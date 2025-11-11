@@ -4,39 +4,12 @@ on:
   push:
     branches:
       - main
-      - 'feature/**'
   pull_request:
     branches:
       - main
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
-  # Auto-create PR when pushing to feature branches
-  create-pr:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/')
-    runs-on: ubuntu-latest
-    name: Auto-create Pull Request
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Create Pull Request
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        BRANCH_NAME=${GITHUB_REF#refs/heads/}
-        EXISTING_PR=$(gh pr list --repo "${{ github.repository }}" --head "${BRANCH_NAME}" --base main --json number --jq '.[0].number')
-
-        if [ -z "${EXISTING_PR}" ]; then
-          gh pr create --repo "${{ github.repository }}" --base main --head "${BRANCH_NAME}" --title "Detection Rule: ${BRANCH_NAME}" --body "Detection rule update from ${BRANCH_NAME}"
-          echo "Pull request created"
-        else
-          echo "Pull request already exists"
-        fi
-
   # Validate rules on PR
   validate:
     if: github.event_name == 'pull_request'
