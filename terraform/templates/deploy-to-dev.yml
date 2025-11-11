@@ -27,36 +27,14 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        BRANCH_NAME=$${GITHUB_REF#refs/heads/}
+        BRANCH_NAME=${GITHUB_REF#refs/heads/}
+        EXISTING_PR=$(gh pr list --repo "${{ github.repository }}" --head "${BRANCH_NAME}" --base main --json number --jq '.[0].number')
 
-        # Check if PR already exists (use github.repository context)
-        EXISTING_PR=$(gh pr list --repo "${{ github.repository }}" --head "$${BRANCH_NAME}" --base main --json number --jq '.[0].number')
-
-        if [ -z "$${EXISTING_PR}" ]; then
-          echo "Creating pull request from $${BRANCH_NAME} to main in ${{ github.repository }}..."
-          gh pr create \
-            --repo "${{ github.repository }}" \
-            --base main \
-            --head "$${BRANCH_NAME}" \
-            --title "Detection Rule: $${BRANCH_NAME}" \
-            --body "$$(cat <<'EOF'
-## Detection Rule Update
-
-This PR contains updates to custom detection rules.
-
-### Checklist
-- [ ] Rule has been tested locally
-- [ ] Rule validation passes
-- [ ] Rule metadata is complete
-- [ ] MITRE ATT&CK mapping is accurate
-
-Once approved and merged to main, this rule will be automatically deployed to the Development environment (ec-dev).
-EOF
-)"
-
-          echo "✅ Pull request created successfully!"
+        if [ -z "${EXISTING_PR}" ]; then
+          gh pr create --repo "${{ github.repository }}" --base main --head "${BRANCH_NAME}" --title "Detection Rule: ${BRANCH_NAME}" --body "Detection rule update from ${BRANCH_NAME}"
+          echo "Pull request created"
         else
-          echo "ℹ️ Pull request #$${EXISTING_PR} already exists"
+          echo "Pull request already exists"
         fi
 
   # Validate rules on PR
@@ -85,26 +63,10 @@ EOF
 
     - name: Validate custom rules
       run: |
-        if [ -d "custom-rules/rules" ] && [ "$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
-          echo "🔍 Validating custom rules..."
+        if [ -d "custom-rules/rules" ] && ls custom-rules/rules/*.toml > /dev/null 2>&1; then
           for rule in custom-rules/rules/*.toml; do
-            echo "Validating: $rule"
-            python -m detection_rules test "$rule" || echo "⚠️ Note: Validation may require additional context"
+            python -m detection_rules test "$rule" || true
           done
-          echo "✅ Validation complete!"
-        else
-          echo "ℹ️ No custom rules found to validate"
-        fi
-
-    - name: Add validation summary
-      if: always()
-      run: |
-        echo "## 🔍 Rule Validation Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ job.status }}" == "success" ]; then
-          echo "✅ All rules passed validation" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "❌ Validation failed - please review the logs" >> $GITHUB_STEP_SUMMARY
         fi
 
   # Deploy to ec-dev when PR is merged to main
@@ -131,79 +93,12 @@ EOF
         pip install lib/kibana
         pip install lib/kql
 
-    - name: Configure detection-rules
-      run: |
-        # Create custom-rules/rules directory if it doesn't exist
-        mkdir -p custom-rules/rules
-
-        # Create detection-rules config file
-        cat > .detection-rules-cfg.json << EOF
-        {
-          "custom_rules_dir": "custom-rules"
-        }
-        EOF
-
-    - name: Validate custom rules
-      run: |
-        if [ -d "custom-rules/rules" ] && [ "$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
-          echo "Validating custom rules..."
-          for rule in custom-rules/rules/*.toml; do
-            echo "Validating: $rule"
-            python -m detection_rules test "$rule" || echo "Note: Validation may require additional context"
-          done
-        else
-          echo "No custom rules found in custom-rules/rules/"
-        fi
-
-    - name: Deploy to Development Kibana (ec-dev)
+    - name: Deploy to Development Kibana
       env:
         ELASTIC_CLOUD_ID: ${{ secrets.DEV_ELASTIC_CLOUD_ID }}
         ELASTIC_API_KEY: ${{ secrets.DEV_ELASTIC_API_KEY }}
       run: |
-        if [ -d "custom-rules/rules" ] && [ "$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
-          echo "🚀 Deploying custom rules to Development environment (ec-dev)..."
-
-          # Update detection-rules config with Elastic Cloud credentials
-          cat > .detection-rules-cfg.json << EOF
-        {
-          "cloud_id": "$${ELASTIC_CLOUD_ID}",
-          "api_key": "$${ELASTIC_API_KEY}",
-          "custom_rules_dir": "custom-rules"
-        }
-        EOF
-
-          # Import rules to Development Kibana
-          python -m detection_rules kibana --space default import-rules \
-            -d custom-rules/rules/ || echo "Note: Some rules may already exist"
-
-          # Clean up config file
-          rm -f .detection-rules-cfg.json
-
-          echo "✅ Development deployment completed successfully!"
-        else
-          echo "ℹ️ No custom rules to deploy to Development"
-        fi
-
-    - name: Create deployment summary
-      if: always()
-      run: |
-        echo "## 🚀 Development Environment Deployment" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        if [ "${{ job.status }}" == "success" ]; then
-          echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Custom detection rules have been deployed to the Development environment (ec-dev)." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: Development (ec-dev)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch**: main" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Next steps:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Test the rules in the Development environment" >> $GITHUB_STEP_SUMMARY
-          echo "2. Run attacks from the red-01 VM to validate detection" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The deployment to Development has failed. Please review the logs above." >> $GITHUB_STEP_SUMMARY
+        mkdir -p custom-rules/rules
+        if ls custom-rules/rules/*.toml > /dev/null 2>&1; then
+          python -m detection_rules kibana --cloud-id="${ELASTIC_CLOUD_ID}" --api-key="${ELASTIC_API_KEY}" --space default import-rules -d custom-rules/rules/ || true
         fi
