@@ -8,214 +8,7 @@ resource "github_repository_file" "deploy_to_dev_workflow" {
   branch     = "main"
   file       = ".github/workflows/deploy-to-dev.yml"
 
-  content = <<-EOT
-name: Detection Rules CI/CD
-
-on:
-  push:
-    branches:
-      - main
-      - 'feature/**'
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:  # Allow manual triggering
-
-jobs:
-  # Auto-create PR when pushing to feature branches
-  create-pr:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/')
-    runs-on: ubuntu-latest
-    name: Auto-create Pull Request
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Create Pull Request
-      env:
-        GH_TOKEN: $${{ github.token }}
-      run: |
-        BRANCH_NAME=$${GITHUB_REF#refs/heads/}
-
-        # Check if PR already exists (use GITHUB_REPOSITORY to stay in this repo)
-        EXISTING_PR=$$(gh pr list --repo "$$GITHUB_REPOSITORY" --head "$$BRANCH_NAME" --base main --json number --jq '.[0].number')
-
-        if [ -z "$$EXISTING_PR" ]; then
-          echo "Creating pull request from $$BRANCH_NAME to main in $$GITHUB_REPOSITORY..."
-          gh pr create \
-            --repo "$$GITHUB_REPOSITORY" \
-            --base main \
-            --head "$$BRANCH_NAME" \
-            --title "Detection Rule: $$BRANCH_NAME" \
-            --body "## Detection Rule Update
-
-This PR contains updates to custom detection rules.
-
-### Checklist
-- [ ] Rule has been tested locally
-- [ ] Rule validation passes
-- [ ] Rule metadata is complete
-- [ ] MITRE ATT&CK mapping is accurate
-
-Once approved and merged to main, this rule will be automatically deployed to the Development environment (ec-dev)."
-
-          echo "✅ Pull request created successfully!"
-        else
-          echo "ℹ️ Pull request #$$EXISTING_PR already exists"
-        fi
-
-  # Validate rules on PR
-  validate:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    name: Validate Detection Rules
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-
-    - name: Install detection-rules dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install .
-        pip install lib/kibana
-        pip install lib/kql
-
-    - name: Validate custom rules
-      run: |
-        if [ -d "custom-rules/rules" ] && [ "$$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
-          echo "🔍 Validating custom rules..."
-          for rule in custom-rules/rules/*.toml; do
-            echo "Validating: $$rule"
-            python -m detection_rules test "$$rule" || echo "⚠️ Note: Validation may require additional context"
-          done
-          echo "✅ Validation complete!"
-        else
-          echo "ℹ️ No custom rules found to validate"
-        fi
-
-    - name: Add validation summary
-      if: always()
-      run: |
-        echo "## 🔍 Rule Validation Results" >> $$GITHUB_STEP_SUMMARY
-        echo "" >> $$GITHUB_STEP_SUMMARY
-        if [ "$${{ job.status }}" == "success" ]; then
-          echo "✅ All rules passed validation" >> $$GITHUB_STEP_SUMMARY
-        else
-          echo "❌ Validation failed - please review the logs" >> $$GITHUB_STEP_SUMMARY
-        fi
-
-  # Deploy to ec-dev when PR is merged to main
-  deploy-to-dev:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    name: Deploy Detection Rules to ec-dev
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-
-    - name: Install detection-rules dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install .
-        pip install lib/kibana
-        pip install lib/kql
-
-    - name: Configure detection-rules
-      run: |
-        # Create custom-rules/rules directory if it doesn't exist
-        mkdir -p custom-rules/rules
-
-        # Create detection-rules config file
-        cat > .detection-rules-cfg.json << EOF
-        {
-          "custom_rules_dir": "custom-rules"
-        }
-        EOF
-
-    - name: Validate custom rules
-      run: |
-        if [ -d "custom-rules/rules" ] && [ "$$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
-          echo "Validating custom rules..."
-          for rule in custom-rules/rules/*.toml; do
-            echo "Validating: $$rule"
-            python -m detection_rules test "$$rule" || echo "Note: Validation may require additional context"
-          done
-        else
-          echo "No custom rules found in custom-rules/rules/"
-        fi
-
-    - name: Deploy to Development Kibana (ec-dev)
-      env:
-        ELASTIC_CLOUD_ID: $${{ secrets.DEV_ELASTIC_CLOUD_ID }}
-        ELASTIC_API_KEY: $${{ secrets.DEV_ELASTIC_API_KEY }}
-      run: |
-        if [ -d "custom-rules/rules" ] && [ "$$(ls -A custom-rules/rules/*.toml 2>/dev/null)" ]; then
-          echo "🚀 Deploying custom rules to Development environment (ec-dev)..."
-
-          # Update detection-rules config with Elastic Cloud credentials
-          cat > .detection-rules-cfg.json << EOF
-        {
-          "cloud_id": "$${ELASTIC_CLOUD_ID}",
-          "api_key": "$${ELASTIC_API_KEY}",
-          "custom_rules_dir": "custom-rules"
-        }
-        EOF
-
-          # Import rules to Development Kibana
-          python -m detection_rules kibana --space default import-rules \
-            -d custom-rules/rules/ || echo "Note: Some rules may already exist"
-
-          # Clean up config file
-          rm -f .detection-rules-cfg.json
-
-          echo "✅ Development deployment completed successfully!"
-        else
-          echo "ℹ️ No custom rules to deploy to Development"
-        fi
-
-    - name: Create deployment summary
-      if: always()
-      run: |
-        echo "## 🚀 Development Environment Deployment" >> $$GITHUB_STEP_SUMMARY
-        echo "" >> $$GITHUB_STEP_SUMMARY
-
-        if [ "$${{ job.status }}" == "success" ]; then
-          echo "### ✅ Deployment Successful" >> $$GITHUB_STEP_SUMMARY
-          echo "" >> $$GITHUB_STEP_SUMMARY
-          echo "Custom detection rules have been deployed to the Development environment (ec-dev)." >> $$GITHUB_STEP_SUMMARY
-          echo "" >> $$GITHUB_STEP_SUMMARY
-          echo "- **Environment**: Development (ec-dev)" >> $$GITHUB_STEP_SUMMARY
-          echo "- **Branch**: main" >> $$GITHUB_STEP_SUMMARY
-          echo "- **Commit**: $${{ github.sha }}" >> $$GITHUB_STEP_SUMMARY
-          echo "" >> $$GITHUB_STEP_SUMMARY
-          echo "Next steps:" >> $$GITHUB_STEP_SUMMARY
-          echo "1. Test the rules in the Development environment" >> $$GITHUB_STEP_SUMMARY
-          echo "2. Run attacks from the red-01 VM to validate detection" >> $$GITHUB_STEP_SUMMARY
-        else
-          echo "### ❌ Deployment Failed" >> $$GITHUB_STEP_SUMMARY
-          echo "" >> $$GITHUB_STEP_SUMMARY
-          echo "The deployment to Development has failed. Please review the logs above." >> $$GITHUB_STEP_SUMMARY
-        fi
-EOT
+  content = file("${path.module}/templates/deploy-to-dev.yml")
 
   commit_message = "Add GitHub Actions workflow for deploying to development"
   commit_author  = "Terraform"
@@ -226,6 +19,96 @@ EOT
   }
 
   depends_on = [
+    null_resource.fork_detection_rules,
+    data.github_repository.detection_rules
+  ]
+}
+
+# Remove old workflow files inherited from elastic/detection-rules fork
+# Keep only deploy-to-dev.yml for the demo
+resource "null_resource" "cleanup_old_workflows" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      set -e
+
+      echo "Cleaning up old workflow files from forked repository..."
+
+      REPO="${var.github_owner}/${var.fork_name}"
+      PROJECT_DIR="${path.module}/../.."
+      REPO_DIR="$${PROJECT_DIR}/${var.fork_name}"
+
+      # List of workflow files to remove (inherited from elastic/detection-rules)
+      OLD_WORKFLOWS=(
+        "add-guidelines.yml"
+        "backport.yml"
+        "branch-status-checks.yml"
+        "code-checks.yml"
+        "community.yml"
+        "docs-build.yml"
+        "docs-cleanup.yml"
+        "esql-validation.yml"
+        "get-target-branches.yml"
+        "kibana-mitre-update.yml"
+        "lock-versions.yml"
+        "manual-backport.yml"
+        "pythonpackage.yml"
+        "react-tests-dispatcher.yml"
+        "release-docs.yml"
+        "release-fleet.yml"
+        "version-code-and-release.yml"
+      )
+
+      # Clone or update the repository
+      if [ -d "$${REPO_DIR}/.git" ]; then
+        echo "Using existing repository at $${REPO_DIR}"
+        cd "$${REPO_DIR}"
+        git fetch origin
+        git checkout main
+        git pull origin main
+      else
+        echo "Cloning repository to $${REPO_DIR}..."
+        git clone "https://github.com/$${REPO}.git" "$${REPO_DIR}"
+        cd "$${REPO_DIR}"
+      fi
+
+      # Check if any old workflows exist
+      WORKFLOWS_TO_DELETE=()
+      for workflow in "$${OLD_WORKFLOWS[@]}"; do
+        if [ -f ".github/workflows/$${workflow}" ]; then
+          WORKFLOWS_TO_DELETE+=("$${workflow}")
+        fi
+      done
+
+      if [ $${#WORKFLOWS_TO_DELETE[@]} -eq 0 ]; then
+        echo "No old workflow files to remove - cleanup already complete"
+        exit 0
+      fi
+
+      echo "Found $${#WORKFLOWS_TO_DELETE[@]} old workflow files to remove"
+
+      # Remove old workflow files
+      for workflow in "$${WORKFLOWS_TO_DELETE[@]}"; do
+        echo "  Removing .github/workflows/$${workflow}"
+        git rm ".github/workflows/$${workflow}"
+      done
+
+      # Commit and push the changes
+      git commit -m "chore: Remove old workflow files from elastic/detection-rules fork
+
+- Removed $${#WORKFLOWS_TO_DELETE[@]} workflow files inherited from upstream
+- Keeping only deploy-to-dev.yml for detection-as-code demo
+- Simplifies GitHub Actions to demo-specific workflows"
+
+      echo "Pushing cleanup changes to main branch..."
+      git push origin main
+
+      echo "✅ Workflow cleanup completed successfully!"
+      echo "Removed $${#WORKFLOWS_TO_DELETE[@]} old workflow files"
+    EOT
+  }
+
+  depends_on = [
+    github_repository_file.deploy_to_dev_workflow,
     null_resource.fork_detection_rules,
     data.github_repository.detection_rules
   ]
