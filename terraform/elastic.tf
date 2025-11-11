@@ -82,3 +82,18 @@ resource "null_resource" "setup_detection_rules" {
     working_dir = path.module
   }
 }
+
+# Ingest test data (true-positive.json and true-negative.json) into Local Elasticsearch
+resource "null_resource" "ingest_test_data" {
+  depends_on = [null_resource.setup_detection_rules]
+
+  # Only run when the local deployment changes
+  triggers = {
+    deployment_id = ec_deployment.local.id
+  }
+
+  provisioner "local-exec" {
+    command     = "scripts/ingest-test-data.sh"
+    working_dir = "${path.module}/.."
+  }
+}

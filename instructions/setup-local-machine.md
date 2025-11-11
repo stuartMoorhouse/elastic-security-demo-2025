@@ -105,12 +105,6 @@ This will install:
 # Check detection-rules CLI is working
 python -m detection_rules --help
 
-# Check version
-python -m detection_rules --version
-```
-
-You should see the help menu and version information.
-
 ---
 
 ## Quick Reference Commands
@@ -165,7 +159,12 @@ python -m detection_rules view-rule rules/linux/execution_web_shell_detection.to
 python -m detection_rules test rules/linux/execution_web_shell_detection.toml
 
 # 6. Export a rule from Kibana
-python -m detection_rules kibana export-rules --rule-id <rule-id>
+## get the enviromental variables from Terraform output
+../security-demo-2025/scripts/setup-detection-rules.sh
+source ../security-demo-2025/scripts/.env-detection-rules
+
+
+python -m detection_rules kibana --cloud-id="${LOCAL_CLOUD_ID}" --api-key="${LOCAL_API_KEY}" export-rules --rule-id "50052ec2-ae29-48b7-a897-4e349c9bb2d3" --directory custom-rules/rules/ --strip-version
 
 # 7. When done, deactivate
 deactivate

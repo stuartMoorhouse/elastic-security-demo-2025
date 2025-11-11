@@ -60,20 +60,15 @@ BLUE_TEAM_IP="10.0.1.50"    # Replace with your blue team VM private IP
 ## Step 2: Export Rule Using detection-rules CLI
 
 # On local machine (with detection-rules installed):
-cd ~/security-demo-detection-rules
+cd ../security-demo-detection-rules
 
 # First, source environment variables
 # Note: The .env-detection-rules file was automatically created during 'terraform apply'
-source ../scripts/.env-detection-rules
+../security-demo-2025/scripts/setup-detection-rules.sh
+source ../security-demo-2025/scripts/.env-detection-rules
 
 # Export the rule:
-python -m detection_rules kibana \
-  --cloud-id="${LOCAL_CLOUD_ID}" \
-  --api-key="${LOCAL_API_KEY}" \
-  export-rules \
-  --rule-id "[RULE_ID from Kibana UI]" \
-  --directory custom-rules/rules/
-  --python -m detection_rules kibana --cloud-id="${LOCAL_CLOUD_ID}" --api-key="${LOCAL_API_KEY}" export-rules --rule-id "3ba83cbd-a40c-45e7-bbf0-752bd49ac096" --directory custom-rules/rules/ --strip-version
+python -m detection_rules kibana --cloud-id="${LOCAL_CLOUD_ID}" --api-key="${LOCAL_API_KEY}" export-rules --rule-id "50052ec2-ae29-48b7-a897-4e349c9bb2d3" --directory custom-rules/rules/ --strip-version
 
 # This creates: custom-rules/rules/tomcat_webshell_detection.toml
 
@@ -92,14 +87,10 @@ python -m detection_rules view-rule custom-rules/rules/tomcat_webshell_detection
 git checkout -b feature/tomcat-webshell-detection
 
 # Add the rule:
-git add custom-rules/rules/tomcat_webshell_detection.toml
+git add . 
 
 # Commit with descriptive message:
 git commit -m "feat: Add Tomcat web shell detection rule
-
-- Detects Java/Tomcat spawning shell processes
-- Maps to MITRE ATT&CK T1190, T1505.003
-- High severity, risk score 73"
 
 # Push to remote:
 git push origin feature/tomcat-webshell-detection

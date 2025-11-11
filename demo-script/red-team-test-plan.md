@@ -47,6 +47,10 @@ This test plan outlines a controlled adversary emulation exercise targeting a vu
 **TTPs Reference:** MITRE ATT&CK Framework v14
 
 ## 5. ATTACK SCENARIO
+### Phase 0.1: Port Scanning (T1046 - Network Service Discovery)
+Technique: TCP port scanning to identify open services
+Tool: Nmap (nmap -sT -p 22,80,443,8080,8443 --open $BLUE_TEAM_IP)
+Expected Detection: Custom rule "Potential SYN-Based Port Scan Detected"
 
 ### Phase 1: Initial Access (T1190 - Exploit Public-Facing Application)
 **Technique:** Exploit Tomcat Manager with weak credentials (tomcat/tomcat)  
@@ -56,35 +60,35 @@ This test plan outlines a controlled adversary emulation exercise targeting a vu
 ### Phase 2: Execution (T1059 - Command and Scripting Interpreter)
 **Technique:** Deploy Java-based web shell via WAR file upload
 **Payload:** Meterpreter reverse TCP (red-01:4444)
-**Expected Detection:** "Suspicious Java Child Process" (OOTB)
+**Expected Detection:** "Potential Reverse Shell Via Java" (OOTB)
 
 ### Phase 3: Discovery (T1082, T1033 - System/User Discovery)
-**Commands:** `whoami`, `id`, `uname -a`, `cat /etc/passwd`  
-**Expected Detection:** "Linux System Information Discovery" (OOTB)
+**Commands:** getconf 
+**Expected Detection:** "Linux System Information Discovery via Getconf" (OOTB)
 
 ### Phase 4: Privilege Escalation (T1548 - Abuse Elevation Control)
 **Technique:** Sudo privilege exploitation  
-**Expected Detection:** "Sudo Command Execution" (OOTB)
+**Expected Detection:** "Sudo Command Enumeration Detected" (OOTB)
 
 ### Phase 5: Persistence (T1053.003 - Cron Job)
 **Technique:** Scheduled task for callback every 15 minutes  
 **Tool:** Metasploit persistence module  
-**Expected Detection:** "Persistence via Cron Job" (OOTB)
+**Expected Detection:** "Cron Job Created or Modified" (OOTB)
 
 ### Phase 6: Credential Access (T1003.008 - /etc/passwd and /etc/shadow)
 **Technique:** Local credential dumping  
 **Tool:** Metasploit `post/linux/gather/hashdump`  
-**Expected Detection:** "Potential Credential Access via /etc/shadow" (OOTB)
+**Expected Detection:** "Potential Shadow File Read via Command Line Utilities" (OOTB)
 
 ### Phase 7: Defense Evasion (T1070.003 - Clear Command History)
 **Technique:** History file manipulation  
 **Commands:** `unset HISTFILE`, `history -c`  
-**Expected Detection:** "Indicator Removal - Clear Command History" (OOTB)
+**Expected Detection:** "Tampering of Shell Command-Line History" (OOTB)
 
 ### Phase 8: Collection (T1074.001 - Local Data Staging)
 **Technique:** Stage sensitive files in hidden directory  
 **Actions:** Create `/tmp/.staging/`, compress data  
-**Expected Detection:** "Data Staging in Unusual Location" (OOTB)
+**Expected Detection:** "Sensitive Files Compression" (OOTB)
 
 ## 6. RULES OF ENGAGEMENT
 
