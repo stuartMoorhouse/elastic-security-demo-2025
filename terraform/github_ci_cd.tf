@@ -1,19 +1,8 @@
 # GitHub CI/CD Configuration for Detection as Code Workflow
-# Automatically deploys detection rules to ec-dev when merged to dev branch
-
-# Create dev branch for deployment workflow
-resource "github_branch" "dev" {
-  repository    = data.github_repository.detection_rules.name
-  branch        = "dev"
-  source_branch = "main"
-
-  depends_on = [
-    data.github_repository.detection_rules
-  ]
-}
+# Automatically deploys detection rules to ec-dev when merged to main branch
 
 # GitHub Actions Workflow - Deploy to Development Environment
-# Triggers when code is pushed to dev branch (after PR merge)
+# Triggers when code is pushed to main branch (after PR merge from feature branches)
 resource "github_repository_file" "deploy_to_dev_workflow" {
   repository = data.github_repository.detection_rules.name
   branch     = "main"
@@ -25,11 +14,11 @@ name: Detection Rules CI/CD
 on:
   push:
     branches:
-      - dev
+      - main
       - 'feature/**'
   pull_request:
     branches:
-      - dev
+      - main
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
@@ -51,13 +40,14 @@ jobs:
       run: |
         BRANCH_NAME=$${GITHUB_REF#refs/heads/}
 
-        # Check if PR already exists
-        EXISTING_PR=$$(gh pr list --head "$$BRANCH_NAME" --base dev --json number --jq '.[0].number')
+        # Check if PR already exists (use GITHUB_REPOSITORY to stay in this repo)
+        EXISTING_PR=$$(gh pr list --repo "$$GITHUB_REPOSITORY" --head "$$BRANCH_NAME" --base main --json number --jq '.[0].number')
 
         if [ -z "$$EXISTING_PR" ]; then
-          echo "Creating pull request from $$BRANCH_NAME to dev..."
+          echo "Creating pull request from $$BRANCH_NAME to main in $$GITHUB_REPOSITORY..."
           gh pr create \
-            --base dev \
+            --repo "$$GITHUB_REPOSITORY" \
+            --base main \
             --head "$$BRANCH_NAME" \
             --title "Detection Rule: $$BRANCH_NAME" \
             --body "## Detection Rule Update
@@ -70,7 +60,7 @@ This PR contains updates to custom detection rules.
 - [ ] Rule metadata is complete
 - [ ] MITRE ATT&CK mapping is accurate
 
-Once approved and merged, this rule will be automatically deployed to the Development environment (ec-dev)."
+Once approved and merged to main, this rule will be automatically deployed to the Development environment (ec-dev)."
 
           echo "✅ Pull request created successfully!"
         else
@@ -125,9 +115,9 @@ Once approved and merged, this rule will be automatically deployed to the Develo
           echo "❌ Validation failed - please review the logs" >> $$GITHUB_STEP_SUMMARY
         fi
 
-  # Deploy to dev when PR is merged
+  # Deploy to ec-dev when PR is merged to main
   deploy-to-dev:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     name: Deploy Detection Rules to ec-dev
 
@@ -214,7 +204,7 @@ Once approved and merged, this rule will be automatically deployed to the Develo
           echo "Custom detection rules have been deployed to the Development environment (ec-dev)." >> $$GITHUB_STEP_SUMMARY
           echo "" >> $$GITHUB_STEP_SUMMARY
           echo "- **Environment**: Development (ec-dev)" >> $$GITHUB_STEP_SUMMARY
-          echo "- **Branch**: dev" >> $$GITHUB_STEP_SUMMARY
+          echo "- **Branch**: main" >> $$GITHUB_STEP_SUMMARY
           echo "- **Commit**: $${{ github.sha }}" >> $$GITHUB_STEP_SUMMARY
           echo "" >> $$GITHUB_STEP_SUMMARY
           echo "Next steps:" >> $$GITHUB_STEP_SUMMARY
@@ -317,7 +307,7 @@ resource "null_resource" "setup_custom_rules_directory" {
       echo "Setting up custom rules directory structure..."
 
       REPO_NAME="${var.fork_name}"
-      PROJECT_DIR="${path.module}/.."
+      PROJECT_DIR="${path.module}/../.."
       REPO_DIR="$${PROJECT_DIR}/$${REPO_NAME}"
       GITHUB_USER="${var.github_owner}"
 
@@ -461,8 +451,7 @@ GITKEEP
 
   depends_on = [
     null_resource.fork_detection_rules,
-    data.github_repository.detection_rules,
-    github_branch.dev
+    data.github_repository.detection_rules
   ]
 }
 
@@ -470,7 +459,6 @@ GITKEEP
 output "github_ci_cd_status" {
   description = "GitHub CI/CD configuration summary"
   value = {
-    dev_branch_created = true
     workflow_file      = github_repository_file.deploy_to_dev_workflow.file
     github_secrets_configured = [
       "DEV_ELASTIC_CLOUD_ID",
@@ -478,11 +466,11 @@ output "github_ci_cd_status" {
     ]
     custom_rules_directory = "custom-rules/rules/"
     deployment_target      = "ec-dev (Development Environment)"
-    workflow_trigger       = "Push to dev branch"
+    deployment_branch      = "main"
+    workflow_trigger       = "Merge PR to main branch"
   }
 
   depends_on = [
-    github_branch.dev,
     github_repository_file.deploy_to_dev_workflow,
     null_resource.setup_github_secrets,
     null_resource.setup_custom_rules_directory

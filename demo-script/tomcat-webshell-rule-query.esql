@@ -4,3 +4,4 @@ FROM logs-endpoint.events.*
   AND process.parent.command_line LIKE "*tomcat*"
   AND process.name IN ("bash", "sh", "dash", "zsh")
   AND (MV_CONTAINS(process.args, "-c") OR MV_CONTAINS(process.args, "-i"))
+| KEEP @timestamp, host.name, process.name, process.command_line, process.parent.name, process.parent.command_line, user.name, process.pid, process.parent.pid, _id, _version, _index

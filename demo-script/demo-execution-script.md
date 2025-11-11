@@ -30,7 +30,7 @@ BLUE_TEAM_IP="10.0.1.50"    # Replace with your blue team VM private IP
 
 # Configure using metadata from: demo-script/tomcat-webshell-rule-metadata.md
 # - Name: Tomcat Manager Web Shell Deployment
-# - Description: [copy from metadata file]
+# - Description: An interactive shell seems to have been spawned by Tomact. 
 # - Severity: High
 # - Risk Score: 73
 # - Index Pattern: logs-endpoint.events.*
@@ -38,17 +38,18 @@ BLUE_TEAM_IP="10.0.1.50"    # Replace with your blue team VM private IP
 # EQL Query: Copy from demo-script/tomcat-webshell-rule-query.eql
 # Paste the query into the query builder
 
-# Configure Schedule:
-# - Runs every: 5 minutes
-# - Additional look-back time: 9 minutes (from = "now-9m")
-
 # Add Tags:
 # - Domain: Endpoint
 # - OS: Linux
 # - Use Case: Threat Detection
-# - Tactic: Initial Access
 # - Tactic: Execution
 # - Data Source: Elastic Defend
+
+# Configure Schedule:
+# - Runs every: 1 minutes
+# - Additional look-back time: 9 minutes (from = "now-9m")
+
+
 
 # MITRE ATT&CK Mapping:
 # - T1190: Exploit Public-Facing Application
@@ -60,18 +61,19 @@ BLUE_TEAM_IP="10.0.1.50"    # Replace with your blue team VM private IP
 
 # On local machine (with detection-rules installed):
 cd ~/security-demo-detection-rules
-source ../.venv/bin/activate  # Or wherever you installed detection-rules
 
-# Get the rule ID from Local Kibana:
-# Security → Rules → Click on "Tomcat Manager Web Shell Deployment" → Copy Rule ID
+# First, source environment variables
+# Note: The .env-detection-rules file was automatically created during 'terraform apply'
+source ../scripts/.env-detection-rules
 
 # Export the rule:
 python -m detection_rules kibana \
-  --cloud-id="[LOCAL_CLOUD_ID from terraform output]" \
-  --api-key="[Create API key in Local Kibana: Stack Management → API keys]" \
+  --cloud-id="${LOCAL_CLOUD_ID}" \
+  --api-key="${LOCAL_API_KEY}" \
   export-rules \
   --rule-id "[RULE_ID from Kibana UI]" \
-  -o custom-rules/rules/
+  --directory custom-rules/rules/
+  --python -m detection_rules kibana --cloud-id="${LOCAL_CLOUD_ID}" --api-key="${LOCAL_API_KEY}" export-rules --rule-id "3ba83cbd-a40c-45e7-bbf0-752bd49ac096" --directory custom-rules/rules/ --strip-version
 
 # This creates: custom-rules/rules/tomcat_webshell_detection.toml
 
@@ -101,6 +103,10 @@ git commit -m "feat: Add Tomcat web shell detection rule
 
 # Push to remote:
 git push origin feature/tomcat-webshell-detection
+
+When creating a PR, look for the dropdown at the top that says:
+base repository: elastic/detection-rules  ← Change this!
+base: main
 
 ## Step 5: Pull Request Auto-Created
 

@@ -1,4 +1,8 @@
 {
+  "labels": {
+    "detection_expected_result": "true_positive",
+    "detection_rule": "tomcat-webshell-detection"
+  },
   "@timestamp": "2025-11-10T15:34:22.847Z",
   "agent": {
     "id": "b1c2d3e4-f5a6-7890-bcde-f12345678901",

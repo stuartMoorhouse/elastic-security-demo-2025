@@ -67,3 +67,18 @@ resource "ec_deployment" "dev" {
     project     = var.project_name
   }
 }
+
+# Automatically create API key and environment variables for detection-rules CLI
+resource "null_resource" "setup_detection_rules" {
+  depends_on = [ec_deployment.local]
+
+  # Only run when the local deployment changes
+  triggers = {
+    deployment_id = ec_deployment.local.id
+  }
+
+  provisioner "local-exec" {
+    command     = "../scripts/setup-detection-rules.sh"
+    working_dir = path.module
+  }
+}

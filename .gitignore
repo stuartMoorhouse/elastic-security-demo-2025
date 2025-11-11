@@ -52,3 +52,10 @@ id_rsa*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Environment files with API keys
+scripts/.env-detection-rules
+
+# Deployment info files
+scripts/elastic-agent-deployment-info.txt
+terraform/elastic-agent-deployment-info.txt
