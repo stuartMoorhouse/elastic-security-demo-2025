@@ -39,7 +39,8 @@ jobs:
             --base main \
             --head "$${BRANCH_NAME}" \
             --title "Detection Rule: $${BRANCH_NAME}" \
-            --body "## Detection Rule Update
+            --body "$$(cat <<'EOF'
+## Detection Rule Update
 
 This PR contains updates to custom detection rules.
 
@@ -49,7 +50,9 @@ This PR contains updates to custom detection rules.
 - [ ] Rule metadata is complete
 - [ ] MITRE ATT&CK mapping is accurate
 
-Once approved and merged to main, this rule will be automatically deployed to the Development environment (ec-dev)."
+Once approved and merged to main, this rule will be automatically deployed to the Development environment (ec-dev).
+EOF
+)"
 
           echo "✅ Pull request created successfully!"
         else
