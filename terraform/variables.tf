@@ -13,9 +13,9 @@ variable "aws_region" {
 }
 
 variable "aws_instance_type" {
-  description = "EC2 instance type (recommended: t3.large with 8GB RAM)"
+  description = "EC2 instance type (should have ~4GB RAM)"
   type        = string
-  default     = "t3.large"
+  default     = "t3.medium"
 }
 
 variable "aws_ami_owner" {

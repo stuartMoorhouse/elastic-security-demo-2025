@@ -3,7 +3,7 @@ project_name = "elastic-security-demo"
 
 # AWS Configuration
 aws_region        = "us-east-1"
-aws_instance_type = "t3.large" # 8GB RAM for VMs (2 vCPU, 8GB RAM)
+aws_instance_type = "t3.medium" # 4GB RAM for VMs (2 vCPU, 4GB RAM)
 
 # Elastic Cloud Configuration
 ec_region                = "us-east-1"
