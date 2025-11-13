@@ -28,7 +28,7 @@ fi
 cd "$TERRAFORM_DIR"
 
 # Check if terraform state exists
-if [ ! -f "../state/terraform.tfstate" ]; then
+if [ ! -f "state/terraform.tfstate" ]; then
     echo -e "${RED}Error: Terraform state not found${NC}"
     echo "Please run 'terraform apply' first"
     exit 1

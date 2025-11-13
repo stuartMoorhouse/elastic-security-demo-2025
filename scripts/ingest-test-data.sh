@@ -47,7 +47,7 @@ print_info "Getting Elasticsearch credentials from Terraform..."
 # Determine if we need to cd to terraform directory
 if [ -d "terraform" ]; then
     cd terraform
-elif [ -f "../state/terraform.tfstate" ]; then
+elif [ -f "state/terraform.tfstate" ]; then
     # Already in terraform directory or subdirectory
     :
 else
@@ -56,7 +56,7 @@ else
 fi
 
 # Check for state file
-if [ ! -f "../state/terraform.tfstate" ] && [ ! -f "terraform.tfstate" ]; then
+if [ ! -f "state/terraform.tfstate" ] && [ ! -f "terraform.tfstate" ]; then
     print_error "Terraform state not found. Have you run 'terraform apply'?"
     exit 1
 fi

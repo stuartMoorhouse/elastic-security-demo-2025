@@ -1,34 +1,86 @@
-{
-  "timestamp": 1657290245020855990,
-  "threadStartTime": 615325807626168,
-  "processorId": 22,
-  "processId": 1664936,
-  "cgroupId": 1,
-  "threadId": 1664936,
-  "parentProcessId": 3795408,
-  "hostProcessId": 1664936,
-  "hostThreadId": 1664936,
-  "hostParentProcessId": 3795408,
-  "userId": 1000,
-  "mountNamespace": 4026531840,
-  "pidNamespace": 4026531836,
-  "processName": "exa",
-  "hostName": "fujitsu",
-  "containerId": "",
-  "containerImage": "",
-  "containerName": "",
-  "podName": "",
-  "podNamespace": "",
-  "podUID": "",
-  "eventId": "257",
-  "eventName": "openat",
-  "argsNum": 4,
-  "returnValue": 3,
-  "stackAddresses": null,
-  "args": [
-    {"name": "dirfd", "type": "int", "value": -100},
-    {"name": "pathname", "type": "const char*", "value": "/etc/ld.so.cache"},
-    {"name": "flags", "type": "int", "value": 524288},
-    {"name": "mode", "type": "mode_t", "value": 0}
-  ]
-}
+[
+  {
+    "timestamp": "2022-07-08T14:30:45.020Z",
+    "host": "prod-web-01",
+    "process": "bash",
+    "event": "execve",
+    "user": "ubuntu",
+    "file": "/usr/bin/curl"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:46.123Z",
+    "host": "prod-web-01",
+    "process": "curl",
+    "event": "connect",
+    "user": "ubuntu",
+    "destination": "185.199.108.153:443"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:47.234Z",
+    "host": "prod-redis-01",
+    "process": "redis-server",
+    "event": "bind",
+    "user": "redis",
+    "port": 6379,
+    "container": "redis-cache"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:48.345Z",
+    "host": "dev-server-02",
+    "process": "python3",
+    "event": "ptrace",
+    "user": "developer",
+    "action": "PTRACE_TRACEME"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:49.456Z",
+    "host": "prod-web-01",
+    "process": "systemd",
+    "event": "openat",
+    "user": "root",
+    "file": "/etc/shadow"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:50.567Z",
+    "host": "prod-nginx-01",
+    "process": "nginx",
+    "event": "accept",
+    "user": "www-data",
+    "source": "203.0.113.42:45678",
+    "container": "web-frontend"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:51.678Z",
+    "host": "dev-server-02",
+    "process": "vim",
+    "event": "read",
+    "user": "ubuntu",
+    "file": "/home/user/.ssh/id_rsa"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:52.789Z",
+    "host": "prod-web-01",
+    "process": "chmod",
+    "event": "fchmodat",
+    "user": "root",
+    "file": "/var/www/html/config.php",
+    "permissions": "777"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:53.890Z",
+    "host": "prod-db-01",
+    "process": "postgres",
+    "event": "write",
+    "user": "postgres",
+    "file": "/var/lib/postgresql/data",
+    "container": "database-primary"
+  },
+  {
+    "timestamp": "2022-07-08T14:30:54.901Z",
+    "host": "dev-server-03",
+    "process": "nc",
+    "event": "sendto",
+    "user": "developer",
+    "destination": "192.168.1.100:4444"
+  }
+]

@@ -62,13 +62,12 @@ BLUE_TEAM_IP="10.0.1.50"    # Replace with your blue team VM private IP
 # On local machine (with detection-rules installed):
 cd ../security-demo-detection-rules
 
-# First, source environment variables
+# setup environment variables
 # Note: The .env-detection-rules file was automatically created during 'terraform apply'
 ../security-demo-2025/scripts/setup-detection-rules.sh
 source ../security-demo-2025/scripts/.env-detection-rules
 
-# Export the rule:
-python -m detection_rules kibana --cloud-id="${LOCAL_CLOUD_ID}" --api-key="${LOCAL_API_KEY}" export-rules --rule-id "50052ec2-ae29-48b7-a897-4e349c9bb2d3" --directory custom-rules/rules/ --strip-version
+
 
 # This creates: custom-rules/rules/tomcat_webshell_detection.toml
 
@@ -84,16 +83,21 @@ python -m detection_rules view-rule custom-rules/rules/tomcat_webshell_detection
 ## Step 4: Commit and Push to Feature Branch
 
 # Create feature branch:
-git checkout -b feature/tomcat-webshell-detection
+git checkout main
+git pull origin main
+git checkout -b feature/tomcat-rule
 
 # Add the rule:
+# export Rule from Kibana
+python -m detection_rules kibana --cloud-id="${LOCAL_CLOUD_ID}" --api-key="${LOCAL_API_KEY}" export-rules --rule-id "c9a62e9c-fd61-4f0f-82f8-8809c39bb8ec" --directory custom-rules/rules/ --strip-version
+
 git add . 
 
 # Commit with descriptive message:
-git commit -m "feat: Add Tomcat web shell detection rule
+git commit -m "feat: Add Tomcat web shell detection rule"
 
 # Push to remote:
-git push origin feature/tomcat-webshell-detection
+git push -u origin feature/tomcat-webshell-detection
 
 When creating a PR, look for the dropdown at the top that says:
 base repository: elastic/detection-rules  ← Change this!

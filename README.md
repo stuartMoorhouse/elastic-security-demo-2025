@@ -277,7 +277,7 @@ security-demo-2025/
 │   ├── outputs.tf              # Output definitions
 │   ├── terraform.tfvars        # Your values (gitignored)
 │   └── terraform.tfvars.example # Example values
-├── state/                       # Terraform state (gitignored)
+│   └── state/                   # Terraform state (gitignored)
 ├── instructions/                # Detailed setup guides
 │   ├── prompt.md               # Original requirements
 │   ├── local-setup.md          # Local machine detection-rules CLI setup
@@ -295,9 +295,9 @@ security-demo-2025/
 
 ## Terraform State Management
 
-This project uses local state stored in the `state/` directory (gitignored) to keep state separate from code.
+This project uses local state stored in the `terraform/state/` directory (gitignored) to keep state separate from code.
 
-**State location:** `state/terraform.tfstate`
+**State location:** `terraform/state/terraform.tfstate`
 
 **Important commands:**
 ```bash
@@ -310,8 +310,8 @@ terraform state list
 # Refresh state from cloud
 terraform refresh
 
-# Backup state before major changes
-cp ../state/terraform.tfstate ../state/terraform.tfstate.backup
+# Backup state before major changes (from terraform/ directory)
+cp state/terraform.tfstate state/terraform.tfstate.backup
 ```
 
 ## Cost Estimates

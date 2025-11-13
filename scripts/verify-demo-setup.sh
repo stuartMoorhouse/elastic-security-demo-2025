@@ -161,7 +161,7 @@ verify_local_prerequisites() {
     fi
 
     # Check Terraform state
-    if [[ -f "${TERRAFORM_DIR}/../state/terraform.tfstate" ]]; then
+    if [[ -f "${TERRAFORM_DIR}/state/terraform.tfstate" ]]; then
         print_success "Terraform state file exists"
     else
         print_failure "Terraform state not found (run 'terraform apply' first)"
