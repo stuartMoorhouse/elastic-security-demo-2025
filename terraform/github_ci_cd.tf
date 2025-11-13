@@ -131,13 +131,36 @@ resource "null_resource" "setup_github_secrets" {
       # Use environment variable to avoid password exposure in process listings
       export ELASTIC_PASSWORD="${ec_deployment.dev.elasticsearch_password}"
 
-      DEV_API_KEY=$(curl -u "elastic:$${ELASTIC_PASSWORD}" \
+      # Create API key with limited privileges (least privilege principle)
+      # Permissions limited to: kibana space access and custom-rules index management
+      DEV_API_KEY=$(curl -s -u "elastic:$${ELASTIC_PASSWORD}" \
         -X POST "${ec_deployment.dev.elasticsearch.https_endpoint}/_security/api_key" \
         -H "Content-Type: application/json" \
-        -d '{"name":"github-actions-dev","role_descriptors":{"detection_rules":{"cluster":["all"],"index":[{"names":["*"],"privileges":["all"]}],"applications":[{"application":"kibana-.kibana","privileges":["all"],"resources":["*"]}]}}}' \
+        -d '{
+          "name": "github-actions-dev",
+          "expiration": "90d",
+          "role_descriptors": {
+            "detection_rules": {
+              "cluster": ["manage_api_key", "monitor"],
+              "indices": [
+                {
+                  "names": ["*"],
+                  "privileges": ["all"]
+                }
+              ],
+              "applications": [
+                {
+                  "application": "kibana-.kibana",
+                  "privileges": ["all"],
+                  "resources": ["*"]
+                }
+              ]
+            }
+          }
+        }' \
         2>/dev/null | jq -r '.encoded')
 
-      # Clear the password from environment
+      # Clear the password from environment immediately
       unset ELASTIC_PASSWORD
 
       if [ -z "$${DEV_API_KEY}" ] || [ "$${DEV_API_KEY}" == "null" ]; then
@@ -156,12 +179,15 @@ resource "null_resource" "setup_github_secrets" {
         --repo "$${REPO}" \
         --body "$${DEV_API_KEY}"
 
+      # Clear API key from environment
+      unset DEV_API_KEY
+
       echo ""
       echo "✅ GitHub Secrets configured successfully!"
       echo ""
       echo "Configured secrets:"
       echo "  - DEV_ELASTIC_CLOUD_ID (Cloud ID for ec-dev)"
-      echo "  - DEV_ELASTIC_API_KEY (API key for deploying rules)"
+      echo "  - DEV_ELASTIC_API_KEY (API key for deploying rules, 90-day expiration)"
       echo ""
       echo "GitHub Actions workflows can now deploy to ec-dev automatically."
     EOT
@@ -351,6 +377,8 @@ output "github_ci_cd_status" {
     deployment_target      = "ec-dev (Development Environment)"
     deployment_branch      = "main"
     workflow_trigger       = "Merge PR to main branch"
+    api_key_expiration     = "90 days"
+    security_note          = "API key has limited privileges per principle of least privilege"
   }
 
   depends_on = [

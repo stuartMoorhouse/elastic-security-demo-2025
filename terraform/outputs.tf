@@ -1,24 +1,23 @@
-# AWS Outputs - Disabled for Detection as Code demo
-# Uncomment when AWS VMs are re-enabled in main.tf
-# output "red_vm" {
-#   description = "Red Team VM (red-01) connection information"
-#   value = {
-#     instance_id = aws_instance.red.id
-#     public_ip   = aws_instance.red.public_ip
-#     private_ip  = aws_instance.red.private_ip
-#     ssh_command = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.red.public_ip}"
-#   }
-# }
-#
-# output "blue_vm" {
-#   description = "Blue Team VM (blue-01) connection information"
-#   value = {
-#     instance_id = aws_instance.blue.id
-#     public_ip   = aws_instance.blue.public_ip
-#     private_ip  = aws_instance.blue.private_ip
-#     ssh_command = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.blue.public_ip}"
-#   }
-# }
+# AWS Outputs
+output "red_vm" {
+  description = "Red Team VM (red-01) connection information"
+  value = {
+    instance_id = aws_instance.red.id
+    public_ip   = aws_instance.red.public_ip
+    private_ip  = aws_instance.red.private_ip
+    ssh_command = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.red.public_ip}"
+  }
+}
+
+output "blue_vm" {
+  description = "Blue Team VM (blue-01) connection information"
+  value = {
+    instance_id = aws_instance.blue.id
+    public_ip   = aws_instance.blue.public_ip
+    private_ip  = aws_instance.blue.private_ip
+    ssh_command = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.blue.public_ip}"
+  }
+}
 
 # Elastic Cloud Outputs
 output "elastic_local" {
@@ -43,10 +42,12 @@ output "elastic_dev" {
   description = "Development Elastic Cloud deployment (for purple team exercise)"
   value = {
     deployment_id      = ec_deployment.dev.id
+    deployment_name    = ec_deployment.dev.name
     elasticsearch_url  = ec_deployment.dev.elasticsearch.https_endpoint
     kibana_url         = ec_deployment.dev.kibana.https_endpoint
     elasticsearch_user = ec_deployment.dev.elasticsearch_username
     cloud_id           = ec_deployment.dev.elasticsearch.cloud_id
+    version            = ec_deployment.dev.version
   }
   sensitive = false
 }

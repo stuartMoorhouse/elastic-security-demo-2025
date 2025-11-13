@@ -98,7 +98,7 @@ run_ssh_command() {
     local timeout="${3:-10}"
 
     ssh -o ConnectTimeout="${timeout}" \
-        -o StrictHostKeyChecking=no \
+        -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile=/dev/null \
         -o LogLevel=ERROR \
         -i ~/.ssh/id_ed25519 \

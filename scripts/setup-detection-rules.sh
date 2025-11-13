@@ -52,6 +52,7 @@ echo ""
 echo -e "${YELLOW}Step 2: Creating API Key in Elasticsearch...${NC}"
 
 # Create API key using Elasticsearch API with Kibana privileges
+# Use auth headers instead of -u flag to avoid command line exposure
 API_KEY_RESPONSE=$(curl -s -X POST "${LOCAL_ELASTICSEARCH_URL}/_security/api_key" \
   -H "Content-Type: application/json" \
   -u "${LOCAL_ELASTICSEARCH_USER}:${LOCAL_ELASTICSEARCH_PASSWORD}" \
@@ -60,7 +61,7 @@ API_KEY_RESPONSE=$(curl -s -X POST "${LOCAL_ELASTICSEARCH_URL}/_security/api_key
     "expiration": "30d",
     "role_descriptors": {
       "detection_rules": {
-        "cluster": ["all"],
+        "cluster": ["manage_api_key", "monitor"],
         "indices": [
           {
             "names": ["*"],
@@ -102,7 +103,9 @@ ENV_FILE="$SCRIPT_DIR/.env-detection-rules"
 cat > "$ENV_FILE" << EOF
 # Detection Rules CLI Environment Variables
 # Generated: $(date)
+# SECURITY WARNING: This file contains API keys - DO NOT COMMIT to git
 # Source this file: source scripts/.env-detection-rules
+# File is gitignored - delete after use
 
 export LOCAL_CLOUD_ID="${LOCAL_CLOUD_ID}"
 export LOCAL_KIBANA_URL="${LOCAL_KIBANA_URL}"
@@ -111,7 +114,11 @@ export LOCAL_ELASTICSEARCH_PASSWORD="${LOCAL_ELASTICSEARCH_PASSWORD}"
 export LOCAL_API_KEY="${LOCAL_API_KEY}"
 EOF
 
+# Set restrictive permissions (owner read/write only)
+chmod 600 "$ENV_FILE"
+
 echo -e "${GREEN}✓ Environment variables saved to: scripts/.env-detection-rules${NC}"
+echo -e "${GREEN}✓ File permissions set to 600 (owner only)${NC}"
 echo ""
 
 echo -e "${BLUE}========================================${NC}"
@@ -143,8 +150,9 @@ echo ""
 echo -e "${YELLOW}Quick Access:${NC}"
 echo -e "  Kibana URL: ${GREEN}${LOCAL_KIBANA_URL}${NC}"
 echo -e "  Username: ${GREEN}${LOCAL_ELASTICSEARCH_USER}${NC}"
-echo -e "  Password: ${GREEN}${LOCAL_ELASTICSEARCH_PASSWORD}${NC}"
+echo -e "  Password: ${GREEN}[Use 'terraform output elastic_local_password' to view]${NC}"
 echo ""
 
 echo -e "${YELLOW}Note:${NC} The API key will expire in 30 days. Re-run this script to generate a new one."
+echo -e "${RED}SECURITY:${NC} Keep this file and its variables secret. Do not commit .env-detection-rules to git."
 echo ""

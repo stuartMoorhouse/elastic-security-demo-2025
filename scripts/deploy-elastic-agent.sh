@@ -12,7 +12,14 @@
 #   - Terraform outputs are available
 #
 # Usage:
-#   ./deploy-elastic-agent.sh
+#   export KIBANA_URL=$(cd terraform && terraform output -json elastic_dev | jq -r '.value.kibana_url')
+#   export ELASTIC_PASSWORD=$(cd terraform && terraform output -raw elastic_dev_password)
+#   export DEPLOYMENT_NAME=$(cd terraform && terraform output -json elastic_dev | jq -r '.value.deployment_name')
+#   export DEPLOYMENT_ID=$(cd terraform && terraform output -json elastic_dev | jq -r '.value.deployment_id')
+#   export ELASTICSEARCH_URL=$(cd terraform && terraform output -json elastic_dev | jq -r '.value.elasticsearch_url')
+#   export BLUE_VM_IP=$(cd terraform && terraform output -json blue_vm | jq -r '.value.public_ip')
+#   export ELASTIC_VERSION=$(cd terraform && terraform output -json elastic_dev | jq -r '.value.version')
+#   ./scripts/deploy-elastic-agent.sh
 #
 # Environment Variables Required:
 #   KIBANA_URL         - Kibana URL from terraform output
@@ -21,7 +28,7 @@
 #   FLEET_URL          - Fleet Server URL (from Kibana integrations)
 #   BLUE_VM_IP         - Public IP of blue-01 VM
 #   SSH_KEY            - Path to SSH private key (default: ~/.ssh/id_ed25519)
-#   AGENT_VERSION      - Elastic Agent version (default: auto-detect from stack)
+#   ELASTIC_VERSION    - Elastic Stack version from Terraform
 #
 # Author: Stuart, Elastic Security Sales Engineering
 # Last Updated: November 2025
@@ -108,6 +115,10 @@ check_env_vars() {
         missing_vars+=("BLUE_VM_IP")
     fi
 
+    if [ -z "$ELASTIC_VERSION" ]; then
+        missing_vars+=("ELASTIC_VERSION")
+    fi
+
     if [ ${#missing_vars[@]} -gt 0 ]; then
         print_error "Missing required environment variables:"
         for var in "${missing_vars[@]}"; do
@@ -117,33 +128,13 @@ check_env_vars() {
         echo "Example usage:"
         echo "  export KIBANA_URL=\$(cd terraform && terraform output -json elastic_dev | jq -r '.value.kibana_url')"
         echo "  export ELASTIC_PASSWORD=\$(cd terraform && terraform output -raw elastic_dev_password)"
-        echo "  export DEPLOYMENT_NAME='elastic-security-demo-dev'"
+        echo "  export DEPLOYMENT_NAME=\$(cd terraform && terraform output -json elastic_dev | jq -r '.value.deployment_name')"
         echo "  export DEPLOYMENT_ID=\$(cd terraform && terraform output -json elastic_dev | jq -r '.value.deployment_id')"
         echo "  export ELASTICSEARCH_URL=\$(cd terraform && terraform output -json elastic_dev | jq -r '.value.elasticsearch_url')"
         echo "  export BLUE_VM_IP=\$(cd terraform && terraform output -json blue_vm | jq -r '.value.public_ip')"
-        echo "  export AGENT_VERSION='9.2.0'  # Optional - will auto-detect if not set"
+        echo "  export ELASTIC_VERSION=\$(cd terraform && terraform output -json elastic_dev | jq -r '.value.version')"
         echo "  ./scripts/deploy-elastic-agent.sh"
         exit 1
-    fi
-}
-
-# Function to detect Elastic Stack version from Kibana
-detect_stack_version() {
-    print_info "Detecting Elastic Stack version from Kibana..."
-
-    VERSION_RESPONSE=$(curl -s --request GET \
-      --url "${KIBANA_URL}/api/status" \
-      --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
-      --header "kbn-xsrf: true")
-
-    DETECTED_VERSION=$(echo "$VERSION_RESPONSE" | jq -r '.version.number')
-
-    if [ -z "$DETECTED_VERSION" ] || [ "$DETECTED_VERSION" = "null" ]; then
-        print_warn "Could not auto-detect version, using default: 9.2.0"
-        echo "9.2.0"
-    else
-        print_info "✓ Detected Elastic Stack version: $DETECTED_VERSION"
-        echo "$DETECTED_VERSION"
     fi
 }
 
@@ -162,13 +153,6 @@ check_env_vars
 FLEET_URL=$(construct_fleet_url "$DEPLOYMENT_NAME" "$DEPLOYMENT_ID" "$ELASTICSEARCH_URL")
 print_info "Constructed Fleet Server URL: $FLEET_URL"
 
-# Set agent version (use env var if set, otherwise auto-detect)
-if [ -z "$AGENT_VERSION" ]; then
-    AGENT_VERSION=$(detect_stack_version)
-else
-    print_info "Using specified agent version: $AGENT_VERSION"
-fi
-
 print_info "Configuration:"
 echo "  Kibana URL: $KIBANA_URL"
 echo "  Fleet URL: $FLEET_URL"
@@ -176,12 +160,12 @@ echo "  Elasticsearch URL: $ELASTICSEARCH_URL"
 echo "  Blue VM IP: $BLUE_VM_IP"
 echo "  SSH Key: $SSH_KEY"
 echo "  Policy Name: $POLICY_NAME"
-echo "  Agent Version: $AGENT_VERSION"
+echo "  Elastic Version: $ELASTIC_VERSION"
 echo ""
 
-# Verify SSH access
+# Verify SSH access (with secure host key handling)
 print_step "Verifying SSH access to blue-01..."
-if ! ssh -i "$SSH_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=no "$SSH_USER@$BLUE_VM_IP" "echo 'SSH connection successful'" > /dev/null 2>&1; then
+if ! ssh -i "$SSH_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null "$SSH_USER@$BLUE_VM_IP" "echo 'SSH connection successful'" > /dev/null 2>&1; then
     print_error "Cannot connect to blue-01 via SSH"
     print_error "Verify the VM is running and SSH_KEY is correct"
     exit 1
@@ -233,31 +217,35 @@ else
     print_info "✓ Agent policy created: $POLICY_ID"
 fi
 
-# Add Elastic Defend integration to the policy
+################################################################################
+# STEP 1b: Add Elastic Defend Integration (3-step process per CLAUDE.md)
+################################################################################
+
 print_info "Adding Elastic Defend integration to policy..."
 
 # Extract major.minor version for package version
-PACKAGE_VERSION=$(echo "$AGENT_VERSION" | cut -d. -f1,2).0
+PACKAGE_VERSION=$(echo "$ELASTIC_VERSION" | cut -d. -f1,2).0
+
+# Step 2a: Create Defend integration with default settings (EDRComplete preset)
+print_info "  [2a/3] Creating Elastic Defend integration with default settings..."
 
 DEFEND_RESPONSE=$(curl -s --request POST \
   --url "${KIBANA_URL}/api/fleet/package_policies" \
   --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
   --header "Content-Type: application/json" \
   --header "kbn-xsrf: true" \
+  --header "kbn-version: ${ELASTIC_VERSION}" \
   --data '{
-    "name": "elastic-defend-policy",
+    "name": "Elastic Defend - Detect Mode",
+    "description": "Defend integration in detect mode",
     "namespace": "default",
-    "description": "Elastic Defend integration for endpoint security",
     "policy_id": "'"${POLICY_ID}"'",
-    "package": {
-      "name": "endpoint",
-      "version": "'"${PACKAGE_VERSION}"'"
-    },
+    "enabled": true,
     "inputs": [
       {
-        "type": "endpoint",
         "enabled": true,
         "streams": [],
+        "type": "ENDPOINT_INTEGRATION_CONFIG",
         "config": {
           "_config": {
             "value": {
@@ -269,18 +257,100 @@ DEFEND_RESPONSE=$(curl -s --request POST \
           }
         }
       }
-    ]
+    ],
+    "package": {
+      "name": "endpoint",
+      "title": "Elastic Defend",
+      "version": "'"${PACKAGE_VERSION}"'"
+    }
   }')
 
 PACKAGE_POLICY_ID=$(echo "$DEFEND_RESPONSE" | jq -r '.item.id')
 
 if [ -z "$PACKAGE_POLICY_ID" ] || [ "$PACKAGE_POLICY_ID" = "null" ]; then
-    print_warn "Failed to add Defend integration (may need manual configuration)"
+    print_error "Failed to create Defend integration"
     echo "Response: $DEFEND_RESPONSE"
-else
-    print_info "✓ Elastic Defend integration added to policy"
+    exit 1
 fi
 
+print_info "  ✓ Defend integration created: $PACKAGE_POLICY_ID"
+
+# Step 2b: GET the current package policy configuration
+print_info "  [2b/3] Retrieving current Defend configuration..."
+
+CURRENT_CONFIG=$(curl -s --request GET \
+  --url "${KIBANA_URL}/api/fleet/package_policies/${PACKAGE_POLICY_ID}" \
+  --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
+  --header "kbn-xsrf: true" \
+  --header "kbn-version: ${ELASTIC_VERSION}")
+
+if [ -z "$CURRENT_CONFIG" ] || [ "$CURRENT_CONFIG" = "null" ]; then
+    print_error "Failed to retrieve current configuration"
+    exit 1
+fi
+
+print_info "  ✓ Current configuration retrieved"
+
+# Step 2c: PUT to update to detect mode
+print_info "  [2c/3] Updating Defend integration to detect mode..."
+
+UPDATE_RESPONSE=$(curl -s --request PUT \
+  --url "${KIBANA_URL}/api/fleet/package_policies/${PACKAGE_POLICY_ID}" \
+  --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
+  --header "Content-Type: application/json" \
+  --header "kbn-xsrf: true" \
+  --header "kbn-version: ${ELASTIC_VERSION}" \
+  --data '{
+    "name": "Elastic Defend - Detect Mode",
+    "namespace": "default",
+    "policy_id": "'"${POLICY_ID}"'",
+    "enabled": true,
+    "package": {
+      "name": "endpoint",
+      "title": "Elastic Defend",
+      "version": "'"${PACKAGE_VERSION}"'"
+    },
+    "inputs": [
+      {
+        "type": "endpoint",
+        "enabled": true,
+        "streams": [],
+        "config": {
+          "policy": {
+            "value": {
+              "windows": {
+                "malware": { "mode": "detect" },
+                "ransomware": { "mode": "detect" },
+                "memory_protection": { "mode": "detect" },
+                "behavior_protection": { "mode": "detect" }
+              },
+              "mac": {
+                "malware": { "mode": "detect" },
+                "behavior_protection": { "mode": "detect" },
+                "memory_protection": { "mode": "detect" }
+              },
+              "linux": {
+                "malware": { "mode": "detect" },
+                "behavior_protection": { "mode": "detect" },
+                "memory_protection": { "mode": "detect" }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }')
+
+UPDATE_SUCCESS=$(echo "$UPDATE_RESPONSE" | jq -r '.success')
+
+if [ "$UPDATE_SUCCESS" != "true" ]; then
+    print_warn "Detect mode update may have failed, but continuing..."
+    echo "Response: $UPDATE_RESPONSE"
+else
+    print_info "  ✓ Defend integration configured to detect mode"
+fi
+
+print_info "✓ Elastic Defend integration fully configured"
 echo ""
 
 ################################################################################
@@ -314,20 +384,20 @@ echo ""
 
 print_step "[3/4] Installing Elastic Agent on blue-01..."
 
-print_info "Downloading Elastic Agent ${AGENT_VERSION}..."
+print_info "Downloading Elastic Agent ${ELASTIC_VERSION}..."
 
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$BLUE_VM_IP" bash << EOSSH
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null "$SSH_USER@$BLUE_VM_IP" bash << EOSSH
 set -e
 
 cd /tmp
 
 # Download agent
-echo "Downloading Elastic Agent ${AGENT_VERSION}..."
-curl -L -O "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-${AGENT_VERSION}-linux-x86_64.tar.gz" 2>&1
+echo "Downloading Elastic Agent ${ELASTIC_VERSION}..."
+curl -L -O "https://artifacts.elastic.co/downloads/beats/elastic-agent/elastic-agent-${ELASTIC_VERSION}-linux-x86_64.tar.gz" 2>&1
 
 # Extract agent
 echo "Extracting Elastic Agent..."
-tar xzf "elastic-agent-${AGENT_VERSION}-linux-x86_64.tar.gz"
+tar xzf "elastic-agent-${ELASTIC_VERSION}-linux-x86_64.tar.gz"
 
 echo "Agent downloaded and extracted successfully"
 EOSSH
@@ -343,10 +413,10 @@ print_step "[4/4] Enrolling and installing Elastic Agent..."
 
 print_info "This will install the agent as a system service..."
 
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$BLUE_VM_IP" bash << EOSSH
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null "$SSH_USER@$BLUE_VM_IP" bash << EOSSH
 set -e
 
-cd /tmp/elastic-agent-${AGENT_VERSION}-linux-x86_64
+cd /tmp/elastic-agent-${ELASTIC_VERSION}-linux-x86_64
 
 # Install agent with enrollment (requires sudo)
 echo "Installing Elastic Agent with Fleet enrollment..."
@@ -371,7 +441,7 @@ print_step "Verifying agent status..."
 sleep 5
 
 # Check agent status on remote host
-AGENT_STATUS=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$SSH_USER@$BLUE_VM_IP" \
+AGENT_STATUS=$(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null "$SSH_USER@$BLUE_VM_IP" \
   "sudo elastic-agent status" 2>&1 || echo "error")
 
 if echo "$AGENT_STATUS" | grep -q "healthy"; then
@@ -396,8 +466,8 @@ echo ""
 print_info "Summary:"
 echo "  Policy ID: $POLICY_ID"
 echo "  Policy Name: $POLICY_NAME"
-echo "  Integration: Elastic Defend (EDR Complete preset)"
-echo "  Agent Version: $AGENT_VERSION"
+echo "  Integration: Elastic Defend (EDR Complete preset, detect mode)"
+echo "  Elastic Version: $ELASTIC_VERSION"
 echo "  Managed by: elastic-security-demo-dev"
 echo ""
 
@@ -427,7 +497,7 @@ Deployment Information:
   Policy ID: $POLICY_ID
   Policy Name: $POLICY_NAME
   Integration: Elastic Defend (EDR Complete)
-  Agent Version: $AGENT_VERSION
+  Elastic Version: $ELASTIC_VERSION
   Deployment: elastic-security-demo-dev
 
 Target VM:
@@ -454,7 +524,7 @@ ENDCONFIG
 print_info "Configuration saved to: $CONFIG_FILE"
 
 echo ""
-print_info "🎯 Blue-01 is now protected and ready for the purple team exercise!"
+print_info "Blue-01 is now protected and ready for the purple team exercise!"
 echo ""
 
 ################################################################################
