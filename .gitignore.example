@@ -1,0 +1,53 @@
+# IDE
+elastic-security-demo.code-workspace
+.vscode/
+.idea/
+
+# Terraform
+terraform/state/
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform.tfstate.backup
+**/terraform.tfvars
+**/.terraformrc
+**/terraform.rc
+**/tfplan
+**/tfplan.*
+**/.terraform.tfstate.lock.info
+
+# Note: .terraform.lock.hcl should be committed to version control
+
+# Example terraform (contains secrets/credentials)
+example-terraform/
+
+# Detection rules repository (forked repo, managed separately)
+detection-rules/
+
+# Credentials and secrets
+**/credentials/
+**/*credentials*.json
+**/*cluster*.json
+
+# SSH Keys
+*.pem
+*.key
+id_rsa*
+
+# Environment files
+.env
+.env.local
+*.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files with API keys
+scripts/.env-detection-rules
+
+# Deployment info files (generated output)
+**/elastic-agent-deployment-info.txt
