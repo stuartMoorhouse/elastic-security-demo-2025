@@ -13,9 +13,9 @@ variable "aws_region" {
 }
 
 variable "aws_instance_type" {
-  description = "EC2 instance type (should have ~4GB RAM)"
+  description = "EC2 instance type (recommended: t3.large with 8GB RAM)"
   type        = string
-  default     = "t3.medium"
+  default     = "t3.large"
 }
 
 variable "aws_ami_owner" {
@@ -50,6 +50,12 @@ variable "vpc_cidr" {
   description = "CIDR block for VPC"
   type        = string
   default     = "10.0.0.0/16"
+}
+
+variable "ssh_public_key_path" {
+  description = "Path to SSH public key for EC2 instance access"
+  type        = string
+  default     = "~/.ssh/id_ed25519.pub"
 }
 
 # Elastic Cloud Configuration

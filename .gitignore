@@ -56,6 +56,5 @@ Thumbs.db
 # Environment files with API keys
 scripts/.env-detection-rules
 
-# Deployment info files
-scripts/elastic-agent-deployment-info.txt
-terraform/elastic-agent-deployment-info.txt
+# Deployment info files (generated output)
+**/elastic-agent-deployment-info.txt

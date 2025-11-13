@@ -5,7 +5,7 @@ output "red_vm" {
     instance_id = aws_instance.red.id
     public_ip   = aws_instance.red.public_ip
     private_ip  = aws_instance.red.private_ip
-    ssh_command = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.red.public_ip}"
+    ssh_command = "ssh -i ${trimsuffix(var.ssh_public_key_path, ".pub")} ubuntu@${aws_instance.red.public_ip}"
   }
 }
 
@@ -15,7 +15,7 @@ output "blue_vm" {
     instance_id = aws_instance.blue.id
     public_ip   = aws_instance.blue.public_ip
     private_ip  = aws_instance.blue.private_ip
-    ssh_command = "ssh -i ~/.ssh/id_ed25519 ubuntu@${aws_instance.blue.public_ip}"
+    ssh_command = "ssh -i ${trimsuffix(var.ssh_public_key_path, ".pub")} ubuntu@${aws_instance.blue.public_ip}"
   }
 }
 
