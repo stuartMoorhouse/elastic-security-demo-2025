@@ -64,7 +64,8 @@ resource "null_resource" "cleanup_old_workflows" {
         cd "$${REPO_DIR}"
         git fetch origin
         git checkout main
-        git pull origin main
+        # Reset to origin/main to handle divergent branches
+        git reset --hard origin/main
       else
         echo "Cloning repository to $${REPO_DIR}..."
         git clone "https://github.com/$${REPO}.git" "$${REPO_DIR}"
@@ -224,11 +225,13 @@ resource "null_resource" "setup_custom_rules_directory" {
       if [ -d "$${REPO_DIR}/.git" ]; then
         echo "Local repository already exists at $${REPO_DIR}"
         cd "$${REPO_DIR}"
-        git pull origin main || echo "Warning: Could not pull latest changes"
+        git fetch origin
+        # Reset to origin/main to handle divergent branches
+        git reset --hard origin/main
       else
         # Clone the repository to project directory
         echo "Cloning repository to $${REPO_DIR}..."
-        git clone --depth 1 "https://github.com/$${GITHUB_USER}/$${REPO_NAME}.git" "$${REPO_DIR}"
+        git clone "https://github.com/$${GITHUB_USER}/$${REPO_NAME}.git" "$${REPO_DIR}"
         cd "$${REPO_DIR}"
       fi
 

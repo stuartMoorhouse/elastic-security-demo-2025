@@ -80,6 +80,15 @@ resource "null_resource" "setup_detection_rules" {
   provisioner "local-exec" {
     command     = "../scripts/setup-detection-rules.sh"
     working_dir = path.module
+
+    # Pass values directly instead of using terraform output (which isn't available during apply)
+    environment = {
+      LOCAL_CLOUD_ID             = ec_deployment.local.elasticsearch.cloud_id
+      LOCAL_KIBANA_URL           = ec_deployment.local.kibana.https_endpoint
+      LOCAL_ELASTICSEARCH_URL    = ec_deployment.local.elasticsearch.https_endpoint
+      LOCAL_ELASTICSEARCH_USER   = ec_deployment.local.elasticsearch_username
+      LOCAL_ELASTICSEARCH_PASSWORD = ec_deployment.local.elasticsearch_password
+    }
   }
 }
 

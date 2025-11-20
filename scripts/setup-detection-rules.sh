@@ -19,29 +19,37 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 
-# Check if terraform directory exists
-if [ ! -d "$TERRAFORM_DIR" ]; then
-    echo -e "${RED}Error: terraform directory not found at $TERRAFORM_DIR${NC}"
-    exit 1
+echo -e "${YELLOW}Step 1: Getting Elastic Cloud configuration...${NC}"
+
+# Check if environment variables are provided (from Terraform provisioner)
+if [ -n "$LOCAL_CLOUD_ID" ] && [ -n "$LOCAL_ELASTICSEARCH_URL" ]; then
+    echo "Using environment variables from Terraform..."
+else
+    # Fallback: Extract from terraform output (for manual runs)
+    echo "Environment variables not set, extracting from Terraform outputs..."
+
+    # Check if terraform directory exists
+    if [ ! -d "$TERRAFORM_DIR" ]; then
+        echo -e "${RED}Error: terraform directory not found at $TERRAFORM_DIR${NC}"
+        exit 1
+    fi
+
+    cd "$TERRAFORM_DIR"
+
+    # Check if terraform state exists
+    if [ ! -f "state/terraform.tfstate" ]; then
+        echo -e "${RED}Error: Terraform state not found${NC}"
+        echo "Please run 'terraform apply' first"
+        exit 1
+    fi
+
+    # Extract outputs from terraform
+    export LOCAL_CLOUD_ID=$(terraform output -json elastic_local | jq -r '.cloud_id')
+    export LOCAL_KIBANA_URL=$(terraform output -json elastic_local | jq -r '.kibana_url')
+    export LOCAL_ELASTICSEARCH_URL=$(terraform output -json elastic_local | jq -r '.elasticsearch_url')
+    export LOCAL_ELASTICSEARCH_USER=$(terraform output -json elastic_local | jq -r '.elasticsearch_user')
+    export LOCAL_ELASTICSEARCH_PASSWORD=$(terraform output -raw elastic_local_password)
 fi
-
-cd "$TERRAFORM_DIR"
-
-# Check if terraform state exists
-if [ ! -f "state/terraform.tfstate" ]; then
-    echo -e "${RED}Error: Terraform state not found${NC}"
-    echo "Please run 'terraform apply' first"
-    exit 1
-fi
-
-echo -e "${YELLOW}Step 1: Extracting Terraform outputs...${NC}"
-
-# Extract outputs from terraform
-export LOCAL_CLOUD_ID=$(terraform output -json elastic_local | jq -r '.cloud_id')
-export LOCAL_KIBANA_URL=$(terraform output -json elastic_local | jq -r '.kibana_url')
-export LOCAL_ELASTICSEARCH_URL=$(terraform output -json elastic_local | jq -r '.elasticsearch_url')
-export LOCAL_ELASTICSEARCH_USER=$(terraform output -json elastic_local | jq -r '.elasticsearch_user')
-export LOCAL_ELASTICSEARCH_PASSWORD=$(terraform output -raw elastic_local_password)
 
 echo -e "${GREEN}✓ Cloud ID: ${LOCAL_CLOUD_ID:0:30}...${NC}"
 echo -e "${GREEN}✓ Kibana URL: ${LOCAL_KIBANA_URL}${NC}"
