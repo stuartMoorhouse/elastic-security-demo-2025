@@ -106,3 +106,33 @@ resource "null_resource" "ingest_test_data" {
     working_dir = "${path.module}/.."
   }
 }
+
+# Automatically deploy Elastic Agent to blue-01 VM after infrastructure is ready
+resource "null_resource" "deploy_elastic_agent" {
+  depends_on = [
+    ec_deployment.dev,
+    aws_instance.blue
+  ]
+
+  # Re-run if dev deployment or blue VM changes
+  triggers = {
+    deployment_id = ec_deployment.dev.id
+    blue_vm_id    = aws_instance.blue.id
+  }
+
+  provisioner "local-exec" {
+    command     = "../scripts/deploy-elastic-agent.sh"
+    working_dir = path.module
+
+    environment = {
+      KIBANA_URL         = ec_deployment.dev.kibana.https_endpoint
+      ELASTIC_PASSWORD   = ec_deployment.dev.elasticsearch_password
+      DEPLOYMENT_NAME    = ec_deployment.dev.name
+      DEPLOYMENT_ID      = ec_deployment.dev.id
+      ELASTICSEARCH_URL  = ec_deployment.dev.elasticsearch.https_endpoint
+      BLUE_VM_IP         = aws_instance.blue.public_ip
+      ELASTIC_VERSION    = ec_deployment.dev.version
+      SSH_KEY            = pathexpand(var.ssh_private_key_path)
+    }
+  }
+}

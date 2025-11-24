@@ -17,9 +17,10 @@ integrations_server_size = "1g"
 integrations_server_zone_count = 1
 
 # Networking
-allowed_ssh_cidr     = "YOUR_IP/32" # CHANGE_ME: Restrict to your IP (e.g., "203.0.113.0/32")
-vpc_cidr             = "10.0.0.0/16"
-ssh_public_key_path  = "~/.ssh/id_ed25519.pub" # Path to your SSH public key
+allowed_ssh_cidr      = "YOUR_IP/32" # CHANGE_ME: Restrict to your IP (e.g., "203.0.113.0/32")
+vpc_cidr              = "10.0.0.0/16"
+ssh_public_key_path   = "~/.ssh/id_ed25519.pub" # Path to your SSH public key
+ssh_private_key_path  = "~/.ssh/id_ed25519"     # Path to your SSH private key (for agent deployment)
 
 # GitHub Configuration
 github_owner = "YOUR_GITHUB_USERNAME" # CHANGE_ME: Your GitHub username (e.g., "octocat")

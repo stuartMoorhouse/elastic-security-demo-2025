@@ -36,7 +36,7 @@ echo "=========================================="
 echo ""
 
 # Check if we're in the correct directory
-if [ ! -f "demo-script/true-positive.json" ] || [ ! -f "demo-script/true-negative.json" ]; then
+if [ ! -f "data/test-data/true-positive.json" ] || [ ! -f "data/test-data/true-negative.json" ]; then
     print_error "Test data files not found. Please run this script from the project root directory."
     exit 1
 fi
@@ -139,7 +139,7 @@ echo ""
 success_count=0
 fail_count=0
 
-if ingest_document "demo-script/true-positive.json" "True Positive (Tomcat spawning bash -c)"; then
+if ingest_document "data/test-data/true-positive.json" "True Positive (Tomcat spawning bash -c)"; then
     ((success_count++))
 else
     ((fail_count++))
@@ -147,7 +147,7 @@ fi
 
 echo ""
 
-if ingest_document "demo-script/true-negative.json" "True Negative (Elasticsearch spawning ls)"; then
+if ingest_document "data/test-data/true-negative.json" "True Negative (Elasticsearch spawning ls)"; then
     ((success_count++))
 else
     ((fail_count++))
@@ -168,8 +168,7 @@ if [ $fail_count -eq 0 ]; then
     echo "  1. Open Local Kibana: $(cd terraform && terraform output -json elastic_local | jq -r '.kibana_url')"
     echo "  2. Navigate to: Security → Rules → Detection rules (SIEM)"
     echo "  3. Create the Tomcat webshell detection rule"
-    echo "  4. Query: copy from demo-script/tomcat-webshell-rule-query.eql"
-    echo "  5. Run the rule to test against ingested data"
+    echo "  4. Run the rule to test against ingested data"
     echo ""
     print_info "To verify ingestion:"
     echo "  curl -u elastic:PASSWORD '${ES_ENDPOINT}/${INDEX_NAME}/_search?pretty' | jq '.hits.total'"
