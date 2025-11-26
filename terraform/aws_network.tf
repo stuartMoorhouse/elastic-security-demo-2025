@@ -6,7 +6,6 @@ resource "aws_vpc" "main" {
 
   tags = {
     Name    = "${var.project_name}-vpc"
-    Project = var.project_name
   }
 }
 
@@ -16,7 +15,6 @@ resource "aws_internet_gateway" "main" {
 
   tags = {
     Name    = "${var.project_name}-igw"
-    Project = var.project_name
   }
 }
 
@@ -34,7 +32,6 @@ resource "aws_subnet" "public" {
 
   tags = {
     Name    = "${var.project_name}-public-subnet"
-    Project = var.project_name
   }
 }
 
@@ -49,7 +46,6 @@ resource "aws_route_table" "public" {
 
   tags = {
     Name    = "${var.project_name}-public-rt"
-    Project = var.project_name
   }
 }
 

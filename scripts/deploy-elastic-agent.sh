@@ -163,10 +163,23 @@ echo "  Policy Name: $POLICY_NAME"
 echo "  Elastic Version: $ELASTIC_VERSION"
 echo ""
 
-# Verify SSH access (with secure host key handling)
-print_step "Verifying SSH access to blue-01..."
-if ! ssh -i "$SSH_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null "$SSH_USER@$BLUE_VM_IP" "echo 'SSH connection successful'" > /dev/null 2>&1; then
-    print_error "Cannot connect to blue-01 via SSH"
+# Wait for SSH access with retry logic (VM may still be booting)
+print_step "Waiting for SSH access to blue-01 (VM may still be booting)..."
+MAX_SSH_ATTEMPTS=30
+SSH_WAIT_INTERVAL=10
+SSH_CONNECTED=false
+
+for attempt in $(seq 1 $MAX_SSH_ATTEMPTS); do
+    if ssh -i "$SSH_KEY" -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null "$SSH_USER@$BLUE_VM_IP" "echo 'SSH connection successful'" > /dev/null 2>&1; then
+        SSH_CONNECTED=true
+        break
+    fi
+    print_info "SSH attempt $attempt/$MAX_SSH_ATTEMPTS failed, waiting ${SSH_WAIT_INTERVAL}s..."
+    sleep $SSH_WAIT_INTERVAL
+done
+
+if [ "$SSH_CONNECTED" = false ]; then
+    print_error "Cannot connect to blue-01 via SSH after $MAX_SSH_ATTEMPTS attempts"
     print_error "Verify the VM is running and SSH_KEY is correct"
     exit 1
 fi

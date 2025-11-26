@@ -24,7 +24,6 @@ resource "aws_security_group" "red" {
 
   tags = {
     Name    = "${var.project_name}-red-sg"
-    Project = var.project_name
     Role    = "red-team"
   }
 }
@@ -64,7 +63,6 @@ resource "aws_security_group" "blue" {
 
   tags = {
     Name    = "${var.project_name}-blue-sg"
-    Project = var.project_name
     Role    = "blue-team"
   }
 }

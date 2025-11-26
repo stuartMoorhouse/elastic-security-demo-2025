@@ -20,8 +20,7 @@ resource "aws_key_pair" "demo" {
   public_key = file(pathexpand(var.ssh_public_key_path))
 
   tags = {
-    Name    = "${var.project_name}-key"
-    Project = var.project_name
+    Name = "${var.project_name}-key"
   }
 }
 
@@ -129,9 +128,8 @@ resource "aws_instance" "red" {
               EOF
 
   tags = {
-    Name    = "red-01"
-    Project = var.project_name
-    Role    = "red-team"
+    Name = "red-01"
+    Role = "red-team"
   }
 }
 
@@ -363,8 +361,7 @@ resource "aws_instance" "blue" {
               EOF
 
   tags = {
-    Name    = "blue-01"
-    Project = var.project_name
-    Role    = "blue-team"
+    Name = "blue-01"
+    Role = "blue-team"
   }
 }

@@ -9,7 +9,7 @@ variable "project_name" {
 variable "aws_region" {
   description = "AWS region for resources"
   type        = string
-  default     = "us-east-1"
+  default     = "eu-north-1"
 }
 
 variable "aws_instance_type" {
@@ -139,4 +139,9 @@ variable "fork_name" {
     condition     = can(regex("^[a-zA-Z0-9_-]{1,100}$", var.fork_name))
     error_message = "fork_name must be a valid repository name (1-100 characters, alphanumeric, hyphens, underscores)"
   }
+}
+variable "default_tags" {
+  description = "Default tags to apply to all resources"
+  type        = map(string)
+  default     = {}
 }
