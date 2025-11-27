@@ -126,6 +126,31 @@ systemctl start tomcat
 # Wait for Tomcat to start
 sleep 10
 
+# Create sensitive files for the demo attack to collect
+# These files will trigger the "Sensitive Files Compression" detection rule
+echo "[8b/8] Creating sensitive files for demo..."
+
+# IMPORTANT: Do NOT overwrite authorized_keys - just append a demo key
+mkdir -p /home/ubuntu/.ssh
+chmod 700 /home/ubuntu/.ssh
+# Append demo key to existing authorized_keys (preserves real SSH access)
+if ! grep -q "demo-key-for-detection" /home/ubuntu/.ssh/authorized_keys 2>/dev/null; then
+    echo "# Demo authorized_keys entry for purple team exercise (attacker collection target)" >> /home/ubuntu/.ssh/authorized_keys
+    echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ... demo-key-for-detection" >> /home/ubuntu/.ssh/authorized_keys
+fi
+chmod 600 /home/ubuntu/.ssh/authorized_keys
+chown -R ubuntu:ubuntu /home/ubuntu/.ssh
+
+# Create a bash_history with some fake commands
+cat > /home/ubuntu/.bash_history << 'HISTORY'
+ls -la
+cd /var/log
+cat /etc/passwd
+sudo apt update
+systemctl status tomcat
+HISTORY
+chown ubuntu:ubuntu /home/ubuntu/.bash_history
+
 # Get IP address
 PRIVATE_IP=$(hostname -I | awk '{print $1}')
 

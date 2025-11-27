@@ -304,8 +304,12 @@ fi
 
 print_info "  ✓ Current configuration retrieved"
 
-# Step 2c: PUT to update to detect mode
-print_info "  [2c/3] Updating Defend integration to detect mode..."
+# Step 2c: PUT to update to detect mode with ALL event collection enabled
+# This enables process, network, file events needed for detection rules like:
+# - Potential Reverse Shell via Java (needs logs-endpoint.events.network*, logs-endpoint.events.process*)
+# - Linux System Information Discovery (needs logs-endpoint.events.process*)
+# - Sensitive Files Compression (needs logs-endpoint.events.*)
+print_info "  [2c/3] Updating Defend integration to detect mode with full event collection..."
 
 UPDATE_RESPONSE=$(curl -s --request PUT \
   --url "${KIBANA_URL}/api/fleet/package_policies/${PACKAGE_POLICY_ID}" \
@@ -332,17 +336,39 @@ UPDATE_RESPONSE=$(curl -s --request PUT \
           "policy": {
             "value": {
               "windows": {
+                "events": {
+                  "process": true,
+                  "network": true,
+                  "file": true,
+                  "registry": true,
+                  "security": true,
+                  "dll_and_driver_load": true,
+                  "dns": true
+                },
                 "malware": { "mode": "detect" },
                 "ransomware": { "mode": "detect" },
                 "memory_protection": { "mode": "detect" },
-                "behavior_protection": { "mode": "detect" }
+                "behavior_protection": { "mode": "detect" },
+                "attack_surface_reduction": { "credential_hardening": { "enabled": true } }
               },
               "mac": {
+                "events": {
+                  "process": true,
+                  "network": true,
+                  "file": true
+                },
                 "malware": { "mode": "detect" },
                 "behavior_protection": { "mode": "detect" },
                 "memory_protection": { "mode": "detect" }
               },
               "linux": {
+                "events": {
+                  "process": true,
+                  "network": true,
+                  "file": true,
+                  "session_data": true,
+                  "tty_io": true
+                },
                 "malware": { "mode": "detect" },
                 "behavior_protection": { "mode": "detect" },
                 "memory_protection": { "mode": "detect" }
@@ -364,6 +390,182 @@ else
 fi
 
 print_info "✓ Elastic Defend integration fully configured"
+echo ""
+
+################################################################################
+# STEP 1c: Add Auditd Manager Integration for Linux audit logs
+# Required for rules that query: logs-auditd_manager.auditd-*
+################################################################################
+
+print_info "Adding Auditd Manager integration to policy..."
+
+# Get the latest auditd_manager package version
+print_info "  Fetching available auditd_manager package version..."
+AUDITD_PACKAGE_INFO=$(curl -s --request GET \
+  --url "${KIBANA_URL}/api/fleet/epm/packages/auditd_manager" \
+  --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
+  --header "kbn-xsrf: true")
+
+AUDITD_VERSION=$(echo "$AUDITD_PACKAGE_INFO" | jq -r '.item.version // .response.version // "1.16.3"')
+print_info "  Using auditd_manager version: $AUDITD_VERSION"
+
+# Check if auditd_manager package is installed, if not install it
+AUDITD_INSTALLED=$(echo "$AUDITD_PACKAGE_INFO" | jq -r '.item.status // .response.status // "not_installed"')
+if [ "$AUDITD_INSTALLED" != "installed" ]; then
+    print_info "  Installing auditd_manager package..."
+    curl -s --request POST \
+      --url "${KIBANA_URL}/api/fleet/epm/packages/auditd_manager/${AUDITD_VERSION}" \
+      --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
+      --header "Content-Type: application/json" \
+      --header "kbn-xsrf: true" \
+      --data '{}' > /dev/null
+    sleep 2
+fi
+
+# Add auditd_manager integration to policy
+print_info "  Creating Auditd Manager integration..."
+AUDITD_RESPONSE=$(curl -s --request POST \
+  --url "${KIBANA_URL}/api/fleet/package_policies" \
+  --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
+  --header "Content-Type: application/json" \
+  --header "kbn-xsrf: true" \
+  --data '{
+    "name": "Auditd Manager - Linux Audit Logs",
+    "description": "Collects Linux audit logs for security detection rules",
+    "namespace": "default",
+    "policy_id": "'"${POLICY_ID}"'",
+    "enabled": true,
+    "inputs": [
+      {
+        "type": "audit/auditd",
+        "enabled": true,
+        "streams": [
+          {
+            "enabled": true,
+            "data_stream": {
+              "type": "logs",
+              "dataset": "auditd_manager.auditd"
+            },
+            "vars": {
+              "socket_type": { "value": "multicast", "type": "text" },
+              "immutable": { "value": false, "type": "bool" },
+              "resolve_ids": { "value": true, "type": "bool" },
+              "failure_mode": { "value": "silent", "type": "text" },
+              "preserve_original_event": { "value": false, "type": "bool" },
+              "backlog_limit": { "value": "8192", "type": "text" },
+              "rate_limit": { "value": "0", "type": "text" },
+              "include_raw_message": { "value": false, "type": "bool" },
+              "include_warnings": { "value": false, "type": "bool" },
+              "backpressure_strategy": { "value": "auto", "type": "text" },
+              "audit_rules": { "value": "## Define audit rules here\n## See auditctl(8) and audit.rules(7) for help\n-w /etc/passwd -p wa -k identity\n-w /etc/shadow -p wa -k identity\n-w /etc/group -p wa -k identity\n-w /etc/gshadow -p wa -k identity\n-a always,exit -F arch=b64 -S execve -k exec\n-a always,exit -F arch=b32 -S execve -k exec", "type": "yaml" },
+              "tags": { "value": ["auditd_manager-auditd"], "type": "text" },
+              "processors": { "value": "", "type": "yaml" }
+            }
+          }
+        ]
+      }
+    ],
+    "package": {
+      "name": "auditd_manager",
+      "title": "Auditd Manager",
+      "version": "'"${AUDITD_VERSION}"'"
+    }
+  }')
+
+AUDITD_POLICY_ID=$(echo "$AUDITD_RESPONSE" | jq -r '.item.id')
+
+if [ -z "$AUDITD_POLICY_ID" ] || [ "$AUDITD_POLICY_ID" = "null" ]; then
+    print_warn "Failed to add Auditd Manager integration (may already exist or not be required)"
+    echo "Response: $AUDITD_RESPONSE"
+else
+    print_info "✓ Auditd Manager integration added: $AUDITD_POLICY_ID"
+fi
+
+echo ""
+
+################################################################################
+# STEP 1d: Add Network Packet Capture Integration for port scan detection
+# Required for rules that query: logs-network_traffic.* (e.g., Port Scan Detection)
+################################################################################
+
+print_info "Adding Network Packet Capture integration to policy..."
+
+# Get the latest network_traffic package version
+print_info "  Fetching available network_traffic package version..."
+NETWORK_PACKAGE_INFO=$(curl -s --request GET \
+  --url "${KIBANA_URL}/api/fleet/epm/packages/network_traffic" \
+  --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
+  --header "kbn-xsrf: true")
+
+NETWORK_VERSION=$(echo "$NETWORK_PACKAGE_INFO" | jq -r '.item.version // .response.version // "1.34.3"')
+print_info "  Using network_traffic version: $NETWORK_VERSION"
+
+# Check if network_traffic package is installed, if not install it
+NETWORK_INSTALLED=$(echo "$NETWORK_PACKAGE_INFO" | jq -r '.item.status // .response.status // "not_installed"')
+if [ "$NETWORK_INSTALLED" != "installed" ]; then
+    print_info "  Installing network_traffic package..."
+    curl -s --request POST \
+      --url "${KIBANA_URL}/api/fleet/epm/packages/network_traffic/${NETWORK_VERSION}" \
+      --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
+      --header "Content-Type: application/json" \
+      --header "kbn-xsrf: true" \
+      --data '{}' > /dev/null
+    sleep 2
+fi
+
+# Add network_traffic integration to policy
+# This captures network flows needed for port scan detection rules
+print_info "  Creating Network Packet Capture integration..."
+NETWORK_RESPONSE=$(curl -s --request POST \
+  --url "${KIBANA_URL}/api/fleet/package_policies" \
+  --user "${ELASTIC_USER}:${ELASTIC_PASSWORD}" \
+  --header "Content-Type: application/json" \
+  --header "kbn-xsrf: true" \
+  --data '{
+    "name": "Network Packet Capture - Flow Monitoring",
+    "description": "Captures network flows for port scan and network attack detection",
+    "namespace": "default",
+    "policy_id": "'"${POLICY_ID}"'",
+    "enabled": true,
+    "inputs": [
+      {
+        "type": "packet",
+        "enabled": true,
+        "streams": [
+          {
+            "enabled": true,
+            "data_stream": {
+              "type": "logs",
+              "dataset": "network_traffic.flow"
+            },
+            "vars": {
+              "period": { "value": "10s", "type": "text" },
+              "timeout": { "value": "30s", "type": "text" },
+              "processors": { "value": "", "type": "yaml" },
+              "tags": { "value": ["network-traffic-flow"], "type": "text" },
+              "interface": { "value": "any", "type": "text" },
+              "geoip_enrich": { "value": true, "type": "bool" }
+            }
+          }
+        ]
+      }
+    ],
+    "package": {
+      "name": "network_traffic",
+      "title": "Network Packet Capture",
+      "version": "'"${NETWORK_VERSION}"'"
+    }
+  }')
+
+NETWORK_POLICY_ID=$(echo "$NETWORK_RESPONSE" | jq -r '.item.id')
+
+if [ -z "$NETWORK_POLICY_ID" ] || [ "$NETWORK_POLICY_ID" = "null" ]; then
+    print_warn "Failed to add Network Packet Capture integration (may already exist or require root)"
+    echo "Response: $NETWORK_RESPONSE"
+else
+    print_info "✓ Network Packet Capture integration added: $NETWORK_POLICY_ID"
+fi
+
 echo ""
 
 ################################################################################
@@ -479,9 +681,23 @@ echo ""
 print_info "Summary:"
 echo "  Policy ID: $POLICY_ID"
 echo "  Policy Name: $POLICY_NAME"
-echo "  Integration: Elastic Defend (EDR Complete preset, detect mode)"
 echo "  Elastic Version: $ELASTIC_VERSION"
 echo "  Managed by: elastic-security-demo-dev"
+echo ""
+echo "  Integrations configured:"
+echo "    - System (logs & metrics) - via sys_monitoring=true"
+echo "    - Elastic Defend (EDR Complete, detect mode, full event collection)"
+echo "      Events: process, network, file, session_data, tty_io"
+echo "    - Auditd Manager (Linux audit logs)"
+echo "    - Network Packet Capture (network flow monitoring)"
+echo ""
+echo "  Index patterns now covered:"
+echo "    - logs-endpoint.events.process*  (from Defend)"
+echo "    - logs-endpoint.events.network*  (from Defend)"
+echo "    - logs-endpoint.events.file*     (from Defend)"
+echo "    - logs-auditd_manager.auditd-*   (from Auditd Manager)"
+echo "    - logs-network_traffic.*         (from Network Packet Capture)"
+echo "    - logs-system.*                  (from System integration)"
 echo ""
 
 print_info "Verify enrollment in Kibana Fleet UI:"
@@ -509,9 +725,22 @@ Generated: $(date)
 Deployment Information:
   Policy ID: $POLICY_ID
   Policy Name: $POLICY_NAME
-  Integration: Elastic Defend (EDR Complete)
   Elastic Version: $ELASTIC_VERSION
   Deployment: elastic-security-demo-dev
+
+Integrations Configured:
+  - System (logs & metrics)
+  - Elastic Defend (EDR Complete, detect mode, full event collection)
+  - Auditd Manager (Linux audit logs)
+  - Network Packet Capture (network flow monitoring)
+
+Index Patterns Covered:
+  - logs-endpoint.events.process*  (from Defend)
+  - logs-endpoint.events.network*  (from Defend)
+  - logs-endpoint.events.file*     (from Defend)
+  - logs-auditd_manager.auditd-*   (from Auditd Manager)
+  - logs-network_traffic.*         (from Network Packet Capture)
+  - logs-system.*                  (from System integration)
 
 Target VM:
   IP Address: $BLUE_VM_IP

