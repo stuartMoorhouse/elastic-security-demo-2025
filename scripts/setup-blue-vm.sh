@@ -29,10 +29,13 @@ apt-get upgrade -y -qq
 echo "[3/8] Installing Java 11..."
 apt-get install -y -qq openjdk-11-jdk wget curl net-tools
 
-# Create tomcat user
-echo "[4/8] Creating tomcat user..."
+# Create tomcat user with login shell and sudo access (INTENTIONALLY INSECURE)
+echo "[4/8] Creating tomcat user with sudo privileges..."
 if ! id "tomcat" &>/dev/null; then
-  useradd -r -m -U -d /opt/tomcat -s /bin/false tomcat
+  useradd -m -U -d /opt/tomcat -s /bin/bash tomcat
+  echo "tomcat:tomcat" | chpasswd
+  echo "tomcat ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/tomcat
+  chmod 440 /etc/sudoers.d/tomcat
 fi
 
 # Download and install Tomcat 9.0.30 (VULNERABLE VERSION)
@@ -149,6 +152,7 @@ Access URLs:
 Credentials (WEAK - FOR DEMO ONLY):
   Username: tomcat
   Password: tomcat
+  Sudo Access: YES (password: tomcat)
 
 Service Commands:
   sudo systemctl status tomcat
@@ -157,6 +161,7 @@ Service Commands:
 
 SECURITY WARNINGS:
   - Weak credentials (tomcat/tomcat)
+  - tomcat user has sudo with password 'tomcat'
   - Remote access enabled
   - Vulnerable Tomcat version (9.0.30)
   - DO NOT expose to internet

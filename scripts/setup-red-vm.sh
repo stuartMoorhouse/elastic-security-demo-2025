@@ -38,8 +38,13 @@ echo "[5/6] Initializing Metasploit database..."
 su - ubuntu -c "msfdb init" || echo "Note: Database initialization skipped (run 'msfdb init' manually after login)"
 
 # Install additional tools
-echo "[6/6] Installing additional tools..."
-apt-get install -y -qq john nikto
+echo "[6/7] Installing additional tools..."
+apt-get install -y -qq john nikto python3 python3-pip
+
+# Create scripts directory for attack automation
+echo "[7/7] Creating scripts directory..."
+mkdir -p /home/ubuntu/scripts
+chown ubuntu:ubuntu /home/ubuntu/scripts
 
 # Verify installation
 echo ""
@@ -69,8 +74,13 @@ Quick Start:
   - Check database: msfdb status
   - View logs: tail -f /var/log/elastic-demo-setup.log
 
+Attack Automation:
+  - Script location: ~/scripts/tomcatastrophe.py
+  - Run: ./scripts/tomcatastrophe.py -t <BLUE_IP> -a <RED_IP>
+  - Help: ./scripts/tomcatastrophe.py --help
+
 Next Steps:
-  1. Review demo-execution-script.md
+  1. Copy tomcatastrophe.py to ~/scripts/
   2. Configure target IP for blue-01
   3. Run attack scenarios
 ENDCONFIG
