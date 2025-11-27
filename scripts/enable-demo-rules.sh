@@ -4,14 +4,12 @@
 # This script installs Elastic prebuilt rules (if not already installed) and
 # enables the following rules in the Dev cluster for the tomcatastrophe demo:
 #
-#   - Potential SYN-Based Port Scan Detected (Phase 0: Reconnaissance)
-#   - Enumeration of Kernel Modules (Phase 3: Discovery)
-#   - Sudo Command Enumeration Detected (Phase 4: Privilege Escalation)
-#   - Cron Job Created or Modified (Phase 5: Persistence)
-#   - Potential Shadow File Read via Command Line Utilities (Phase 6: Credential Access)
-#   - Sensitive Files Compression (Phase 8: Collection)
+#   - Sudo Command Enumeration Detected (Privilege Escalation)
+#   - Cron Job Created or Modified (Persistence)
+#   - Potential Shadow File Read via Command Line Utilities (Credential Access)
+#   - Sensitive Files Compression (Collection)
 #
-# Note: Phase 1 (Initial Access) is detected by Elastic Defend behavioral alerts
+# Note: Initial Access and Execution are detected by Elastic Defend behavioral alerts
 #
 # Usage:
 #   ./enable-demo-rules.sh
@@ -66,8 +64,6 @@ sleep 2
 
 # Rule names to enable (must match exactly)
 RULE_NAMES=(
-    "Potential SYN-Based Port Scan Detected"
-    "Enumeration of Kernel Modules"
     "Sudo Command Enumeration Detected"
     "Cron Job Created or Modified"
     "Potential Shadow File Read via Command Line Utilities"

