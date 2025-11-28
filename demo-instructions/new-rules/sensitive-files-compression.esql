@@ -1,0 +1,10 @@
+FROM logs-endpoint.events.process-* METADATA _id, _version, _index
+| WHERE @timestamp > NOW() - 5 minutes
+| WHERE process.name IN ("tar", "zip", "gzip", "7z", "rar")
+  AND (process.command_line LIKE "*/etc/shadow*"
+    OR process.command_line LIKE "*/etc/passwd*"
+    OR process.command_line LIKE "*/.ssh/*"
+    OR process.command_line LIKE "*/.bash_history*"
+    OR process.command_line LIKE "*/.aws/*"
+    OR process.command_line LIKE "*/etc/gshadow*")
+| KEEP @timestamp, host.name, user.name, process.name, process.command_line, process.pid, process.parent.name, _id, _version, _index

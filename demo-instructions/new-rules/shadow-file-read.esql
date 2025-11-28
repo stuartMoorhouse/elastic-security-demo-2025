@@ -1,0 +1,4 @@
+FROM logs-endpoint.events.process-* METADATA _id, _version, _index
+| WHERE @timestamp > NOW() - 5 minutes
+| WHERE process.name IN ("cat", "head", "tail", "less", "more", "grep", "awk", "sed", "xxd", "strings") AND process.command_line LIKE "*/etc/shadow*"
+| KEEP @timestamp, host.name, user.name, process.name, process.command_line, process.pid, process.parent.name, _id, _version, _index
