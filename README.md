@@ -55,7 +55,7 @@ This project automates the deployment of a complete security demonstration envir
 ## Purple Team Exercise Workflow
 
 ### Setup Phase (Your Local Machine)
-1. **Setup** - Configure detection-rules CLI on your local machine (see `instructions/local-setup.md`)
+1. **Setup** - Configure detection-rules CLI on your local machine (see `demo-instructions/setup-local-machine.md`)
 2. **Design** - Create custom detection rule in Kibana (ec-local)
 3. **Export** - Export rule using detection-rules CLI to local repository
 4. **Commit** - Push rule to GitHub fork
@@ -174,7 +174,7 @@ terraform output -json > ../deployment-info.json
 **First, configure your local machine for rule development:**
 
 ```bash
-# Follow instructions/local-setup.md
+# Follow demo-instructions/setup-local-machine.md
 # This sets up:
 # - detection-rules CLI
 # - Python virtual environment
@@ -255,11 +255,11 @@ curl http://localhost:8080
 # ✓ Manager app accessible
 ```
 
-**Next step: Install Elastic Agent on blue-01** (see instructions/blue-vm.md for agent setup)
+**Next step: Install Elastic Agent on blue-01** (see demo-instructions/demo-execution-script.md for agent setup)
 
 ### 6. Run Purple Team Exercise
 
-Follow `instructions/demo-execution-script.md` for the complete purple team exercise workflow.
+Follow `demo-instructions/demo-execution-script.md` for the complete purple team exercise workflow.
 
 ## Project Structure
 
@@ -278,12 +278,10 @@ security-demo-2025/
 │   ├── terraform.tfvars        # Your values (gitignored)
 │   └── terraform.tfvars.example # Example values
 │   └── state/                   # Terraform state (gitignored)
-├── instructions/                # Detailed setup guides
-│   ├── prompt.md               # Original requirements
-│   ├── local-setup.md          # Local machine detection-rules CLI setup
-│   ├── red-vm.md               # Red team VM setup (Metasploit)
-│   ├── blue-vm.md              # Blue team VM setup (Tomcat + Agent)
-│   └── demo-execution-script.md # Purple team exercise workflow
+├── demo-instructions/           # Detailed setup guides
+│   ├── setup-local-machine.md  # Local machine detection-rules CLI setup
+│   ├── demo-execution-script.md # Purple team exercise workflow
+│   └── red-team-test-plan.md   # Red team test scenarios
 ├── detection-rules/             # Forked detection-rules repo (gitignored, auto-cloned)
 │   ├── dac-demo/               # Custom detection rules directory
 │   │   ├── rules/              # Your custom .toml rule files
@@ -461,10 +459,9 @@ terraform apply -target=ec_deployment.local -target=ec_deployment.dev -destroy
 
 ### Included Guides
 
-- `instructions/local-setup.md` - Local machine detection-rules CLI setup (20-30 min)
-- `instructions/red-vm.md` - Red team VM setup with Metasploit (15-20 min)
-- `instructions/blue-vm.md` - Blue team VM with vulnerable Tomcat and Elastic Agent
-- `instructions/demo-execution-script.md` - Full purple team exercise workflow (30-35 min)
+- `demo-instructions/setup-local-machine.md` - Local machine detection-rules CLI setup
+- `demo-instructions/demo-execution-script.md` - Full purple team exercise workflow
+- `demo-instructions/red-team-test-plan.md` - Red team test scenarios
 
 ### External Resources
 
