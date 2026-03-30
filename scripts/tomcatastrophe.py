@@ -12,6 +12,8 @@ Prerequisites:
 """
 
 import argparse
+import os
+import shlex
 import subprocess
 import sys
 import time
@@ -117,8 +119,7 @@ class DemoTerminal:
         time.sleep(0.25)
 
         result = subprocess.run(
-            cmd,
-            shell=True,
+            shlex.split(cmd),
             capture_output=True,
             text=True,
         )
@@ -141,7 +142,7 @@ class DemoTerminal:
 
         time.sleep(0.25)
 
-        result = subprocess.run(cmd, shell=True)
+        result = subprocess.run(shlex.split(cmd))
         return result.returncode
 
 
@@ -154,15 +155,18 @@ class AttackExecutor:
 
     def cleanup_previous_runs(self) -> None:
         """Kill any lingering processes from previous runs."""
-        subprocess.run(
-            "pkill -9 msfconsole 2>/dev/null; "
-            "pkill -9 -f 'nc.*4444' 2>/dev/null; "
-            "pkill -9 -f 'nc.*4445' 2>/dev/null; "
-            "rm -f /tmp/tomcatastrophe_abort 2>/dev/null; "
-            "sleep 1",
-            shell=True,
-            capture_output=True,
-        )
+        for cmd in [
+            ["pkill", "-9", "msfconsole"],
+            ["pkill", "-9", "-f", "nc.*4444"],
+            ["pkill", "-9", "-f", "nc.*4445"],
+        ]:
+            subprocess.run(cmd, capture_output=True)
+        abort_file = "/tmp/tomcatastrophe_abort"
+        try:
+            os.remove(abort_file)
+        except FileNotFoundError:
+            pass
+        time.sleep(1)
 
     def run_exploit_phases(self) -> None:
         """Run phases 1 and 3-8 in a single msfconsole session."""

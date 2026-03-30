@@ -32,6 +32,11 @@ resource "aws_instance" "red" {
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.red.id]
 
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
+
   root_block_device {
     volume_size = 20
     volume_type = "gp3"
@@ -150,6 +155,11 @@ resource "aws_instance" "blue" {
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.blue.id]
 
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
+
   root_block_device {
     volume_size = 20
     volume_type = "gp3"
@@ -192,6 +202,11 @@ resource "aws_instance" "blue" {
               if ! id "tomcat" &>/dev/null; then
                 useradd -r -m -U -d /opt/tomcat -s /bin/false tomcat
               fi
+
+              # Configure passwordless sudo for tomcat (INTENTIONALLY INSECURE - for demo)
+              # This simulates a misconfiguration that allows privilege escalation
+              echo "tomcat ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/tomcat
+              chmod 440 /etc/sudoers.d/tomcat
 
               # Download and install Tomcat 9.0.30 (VULNERABLE VERSION)
               echo "[5/8] Downloading Tomcat 9.0.30..."
@@ -315,6 +330,7 @@ resource "aws_instance" "blue" {
 
               SECURITY WARNINGS:
                 - Weak credentials (tomcat/tomcat)
+                - Passwordless sudo for tomcat user (privilege escalation)
                 - Remote access enabled
                 - Vulnerable Tomcat version (9.0.30)
                 - DO NOT expose to internet
